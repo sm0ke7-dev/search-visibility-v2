@@ -1,6 +1,56 @@
 const fs = require('fs');
 const path = require('path');
 
+/**
+ * Converts Google Sheets data to preflight structure
+ * @param {Array} sheetData - Array of row arrays from Google Sheets
+ * Expected columns: [Office, Targets, service, lat, long, rank, ranking url, ...]
+ * @returns {Object} Preflight data structure grouped by office
+ */
+const buildPreflightFromSheet = (sheetData) => {
+  const output = {};
+
+  // Skip header row, process data rows
+  for (let i = 1; i < sheetData.length; i++) {
+    const row = sheetData[i];
+
+    // Extract data from columns
+    const office = row[0]?.toString().trim(); // Office
+    const target = row[1]?.toString().trim(); // Targets
+    const service = row[2]?.toString().trim(); // service
+    const lat = parseFloat(row[3]); // lat
+    const long = parseFloat(row[4]); // long
+
+    // Skip incomplete rows
+    if (!office || !target || !service || isNaN(lat) || isNaN(long)) {
+      continue;
+    }
+
+    // Create geo coordinate string
+    const geo_coordinate = `${lat},${long}`;
+
+    // Generate intended URL
+    const intended_url = `https://${office.toLowerCase()}.aaacwildliferemoval.com/service-area/${target.toLowerCase().replace(/\s+/g, '-')}/`;
+
+    // Initialize office group if not exists
+    if (!output[office]) {
+      output[office] = [];
+    }
+
+    // Create entry for this keyword/location combination
+    output[office].push({
+      location: target,
+      service: service,
+      intended_url: intended_url,
+      geo_coordinate: geo_coordinate,
+      keywords: [service] // Simple: just use the service as the keyword
+    });
+  }
+
+  return output;
+};
+
+// Original function for backwards compatibility with local JSON files
 const buildPreflight = ({ rankingPages, serviceLocationData, placeholders }) => {
   const output = {};
 
@@ -67,4 +117,5 @@ if (require.main === module) {
   preflight();
 }
 
-module.exports = buildPreflight; 
+module.exports = buildPreflight;
+module.exports.buildPreflightFromSheet = buildPreflightFromSheet; 
