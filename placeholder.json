@@ -1,0 +1,5 @@
+[
+    "{keyword}",
+    "{keyword} {location}",
+    "{location} {keyword}"
+]
