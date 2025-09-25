@@ -9,7 +9,8 @@ A Google Sheets-integrated ranking tracker that monitors keyword positions daily
 - **Two-Phase Workflow**: Submit jobs → Wait 2-5 minutes → Get results
 - **Secure API Storage**: Uses Google Apps Script Properties for API credentials
 - **Mobile-First**: Targets mobile rankings (Android device simulation)
-- **Domain Filtering**: Only shows rankings for aaacwildliferemoval.com domain
+- **Specific URL Tracking**: Tracks rankings for exact prime_url instead of domain-wide
+- **Complete Audit Trail**: Automatic logging of all API requests and responses for transparency
 
 ## 📊 Workflow
 
@@ -46,20 +47,41 @@ B: Targets   (Garland, Irving, etc.)
 C: service   (wildlife removal, raccoon removal)
 D: lat       (32.91292795)
 E: long      (-96.63675497)
+F: prime_url (https://dallas.aaacwildliferemoval.com/service-area/garland/)
 ```
 
-Results will auto-populate in columns F, G, H, I, J, K, etc.
+Results will auto-populate in columns G, H, I, J, K, L, etc.
 
 ## 📈 Historical Tracking
 
 Each ranking check creates 3 new columns:
 ```
-Check 1: F (Task ID) | G (Rank) | H (Date)
-Check 2: I (Task ID) | J (Rank) | K (Date)
-Check 3: L (Task ID) | M (Rank) | N (Date)
+Check 1: G (Task ID) | H (Rank) | I (Date)
+Check 2: J (Task ID) | K (Rank) | L (Date)
+Check 3: M (Task ID) | N (Rank) | O (Date)
 ```
 
 Perfect for tracking ranking improvements over time! 📊
+
+## 📋 Two-Tab Audit System
+
+Every API interaction is automatically logged to separate audit tabs for clean organization:
+
+### Submit Requests Tab (`submit_requests`)
+Logs all requests sent to DataForSEO when you click "Submit Ranking Jobs":
+- **Prime URL**: The specific URL being tracked
+- **Request Data**: Complete JSON payload sent to DataForSEO API
+
+### Results Dump Tab (`results_dump`)
+Logs all raw responses from DataForSEO when you click "Get Results":
+- **Prime URL**: The specific URL being tracked
+- **Raw DataForSEO Response**: Complete unfiltered response including all SERP data
+
+### Benefits:
+- 🔍 **Debug rankings**: See exactly what DataForSEO returned in raw format
+- 🎯 **Prime URL verification**: Confirm rankings are for your exact URLs
+- 🧹 **Clean separation**: Request data and response data in separate tabs
+- 📊 **Complete transparency**: Full audit trail of all API interactions
 
 ## 🎯 Custom Menu
 
@@ -70,6 +92,8 @@ Once installed, you'll see this menu in Google Sheets:
 ├── 📥 Get Results
 ├── ────────────────
 ├── 📊 View Job Status
+├── 📋 View Submit Requests
+├── 📋 View Results Dump
 ├── 🧹 Clear Task Data
 ├── ────────────────
 └── ⚙️ Test Connection

@@ -31,9 +31,13 @@ function getDataForSEOConfig() {
 }
 
 /**
- * Sheet configuration - using single "rankmonitor" tab for everything
+ * Sheet configuration
  */
-const SHEET_NAME = 'rankmonitor';
+const SHEET_NAMES = {
+  RANK_MONITOR: 'rankmonitor',
+  SUBMIT_REQUESTS: 'submit_requests',
+  RESULTS_DUMP: 'results_dump'
+};
 
 /**
  * Base column configuration for rankmonitor sheet
@@ -44,7 +48,8 @@ const BASE_COLUMNS = {
   SERVICE: 2,      // Column C
   LAT: 3,          // Column D
   LONG: 4,         // Column E
-  FIRST_DATA_COL: 5 // Column F - where data columns start
+  PRIME_URL: 5,    // Column F (manual entry - specific page to track)
+  FIRST_DATA_COL: 6 // Column G - where data columns start
 };
 
 /**
@@ -79,6 +84,8 @@ function onOpen() {
     .addItem('📥 Get Results', 'getRankingResults')
     .addSeparator()
     .addItem('📊 View Job Status', 'checkJobStatus')
+    .addItem('📋 View Submit Requests', 'viewSubmitRequests')
+    .addItem('📋 View Results Dump', 'viewResultsDump')
     .addItem('🧹 Clear Task Data', 'clearTaskData')
     .addSeparator()
     .addItem('⚙️ Test Connection', 'testDataForSEOConnection')
@@ -186,7 +193,7 @@ function getRankingResults() {
  * Gets all data from the rankmonitor sheet
  */
 function getSheetData() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAMES.RANK_MONITOR);
   return sheet.getDataRange().getValues();
 }
 
@@ -194,7 +201,111 @@ function getSheetData() {
  * Gets the rankmonitor sheet
  */
 function getRankMonitorSheet() {
-  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAMES.RANK_MONITOR);
+}
+
+/**
+ * Gets or creates the submit requests sheet
+ */
+function getSubmitRequestsSheet() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = spreadsheet.getSheetByName(SHEET_NAMES.SUBMIT_REQUESTS);
+
+  // Create sheet if it doesn't exist
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(SHEET_NAMES.SUBMIT_REQUESTS);
+
+    // Set up headers
+    const headers = ['Prime URL', 'Request Data'];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+    // Format headers
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#e8f4fd');
+
+    // Set column widths
+    sheet.setColumnWidth(1, 300); // Prime URL
+    sheet.setColumnWidth(2, 500); // Request Data
+
+    console.log('✅ Created submit_requests sheet');
+  }
+
+  return sheet;
+}
+
+/**
+ * Gets or creates the results dump sheet
+ */
+function getResultsDumpSheet() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = spreadsheet.getSheetByName(SHEET_NAMES.RESULTS_DUMP);
+
+  // Create sheet if it doesn't exist
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(SHEET_NAMES.RESULTS_DUMP);
+
+    // Set up headers
+    const headers = ['Prime URL', 'Raw DataForSEO Response'];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+    // Format headers
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f3e8ff');
+
+    // Set column widths
+    sheet.setColumnWidth(1, 300); // Prime URL
+    sheet.setColumnWidth(2, 600); // Raw DataForSEO Response
+
+    console.log('✅ Created results_dump sheet');
+  }
+
+  return sheet;
+}
+
+/**
+ * Logs submit request to submit_requests sheet
+ * @param {string} primeUrl - The prime URL being tracked
+ * @param {Object} requestData - The request data sent to DataForSEO
+ */
+function logSubmitRequest(primeUrl, requestData) {
+  try {
+    const sheet = getSubmitRequestsSheet();
+
+    const rowData = [
+      primeUrl || '',
+      JSON.stringify(requestData, null, 2)
+    ];
+
+    sheet.appendRow(rowData);
+    console.log(`📤 Submit request logged for: ${primeUrl}`);
+
+  } catch (error) {
+    console.error('Failed to log submit request:', error);
+  }
+}
+
+/**
+ * Logs raw DataForSEO response to results_dump sheet
+ * @param {string} primeUrl - The prime URL being tracked
+ * @param {Object} rawResponse - Raw response from DataForSEO
+ */
+function logResultsDump(primeUrl, rawResponse) {
+  try {
+    const sheet = getResultsDumpSheet();
+
+    const rowData = [
+      primeUrl || '',
+      JSON.stringify(rawResponse, null, 2)
+    ];
+
+    sheet.appendRow(rowData);
+    console.log(`📥 Results dump logged for: ${primeUrl}`);
+
+  } catch (error) {
+    console.error('Failed to log results dump:', error);
+  }
 }
 
 /**
@@ -214,9 +325,10 @@ function buildPreflightFromSheet(sheetData) {
     const service = row[BASE_COLUMNS.SERVICE]?.toString().trim();
     const lat = parseFloat(row[BASE_COLUMNS.LAT]);
     const long = parseFloat(row[BASE_COLUMNS.LONG]);
+    const primeUrl = row[BASE_COLUMNS.PRIME_URL]?.toString().trim();
 
     // Skip incomplete rows
-    if (!office || !target || !service || isNaN(lat) || isNaN(long)) {
+    if (!office || !target || !service || isNaN(lat) || isNaN(long) || !primeUrl) {
       continue;
     }
 
@@ -236,6 +348,7 @@ function buildPreflightFromSheet(sheetData) {
       location: target,
       service: service,
       intended_url: intended_url,
+      prime_url: primeUrl, // Store the specific URL to track
       geo_coordinate: geo_coordinate,
       keywords: [service],
       rowIndex: i // Store row index for writing task IDs back
@@ -257,7 +370,7 @@ function submitJobsToDataForSEO(preflightData) {
     results[office] = [];
 
     for (const item of items) {
-      const { geo_coordinate, keywords, rowIndex } = item;
+      const { geo_coordinate, keywords, rowIndex, location, service, prime_url } = item;
 
       for (const keyword of keywords) {
         try {
@@ -269,6 +382,9 @@ function submitJobsToDataForSEO(preflightData) {
             "device": "mobile",
             "os": "android"
           }];
+
+          // Log request to submit_requests tab
+          logSubmitRequest(prime_url, postData[0]);
 
           // Make API call
           const response = UrlFetchApp.fetch(`${config.baseUrl}/task_post`, {
@@ -283,6 +399,9 @@ function submitJobsToDataForSEO(preflightData) {
           const responseData = JSON.parse(response.getContentText());
           const taskId = responseData.tasks[0].id;
 
+          // Log successful response to audit
+          console.log(`✅ Job submitted successfully for ${prime_url}: ${taskId}`);
+
           results[office].push({
             ...item,
             keyword: keyword,
@@ -292,6 +411,10 @@ function submitJobsToDataForSEO(preflightData) {
 
         } catch (error) {
           console.error(`Error submitting job for keyword "${keyword}":`, error);
+
+          // Log error to audit
+          console.error(`❌ Failed to submit job for ${prime_url}: ${error.message}`);
+
           results[office].push({
             ...item,
             keyword: keyword,
@@ -373,6 +496,7 @@ function getTaskIdsFromSheet() {
         keyword: data[i][BASE_COLUMNS.SERVICE],
         office: data[i][BASE_COLUMNS.OFFICE],
         target: data[i][BASE_COLUMNS.TARGETS],
+        prime_url: data[i][BASE_COLUMNS.PRIME_URL], // Include prime_url for ranking check
         taskColumn: mostRecentTaskCol
       });
     }
@@ -392,6 +516,9 @@ function fetchResultsFromDataForSEO(taskIds) {
 
   for (const task of taskIds) {
     try {
+      // Log request to audit
+      console.log(`📥 Fetching results for ${task.prime_url}: ${task.taskId}`);
+
       // Fetch results for this task
       const response = UrlFetchApp.fetch(
         `${config.baseUrl}/task_get/regular/${task.taskId}`,
@@ -404,14 +531,30 @@ function fetchResultsFromDataForSEO(taskIds) {
       const taskResult = responseData.tasks[0];
 
       if (taskResult.result && taskResult.result.length > 0) {
-        // Extract ranking data
-        const rankings = extractRankingData(taskResult.result);
+        // Extract ranking data for the specific prime_url
+        const rankings = extractRankingData(taskResult.result, task.prime_url);
+
+        // Get raw SERP results (all organic items)
+        const rawSerpItems = taskResult.result[0]?.items || [];
+
+        // Debug: log the structure to understand what we're getting
+        console.log('TaskResult structure:', JSON.stringify(taskResult, null, 2));
+
+        // Log successful response to audit
+        // Log raw DataForSEO response to results_dump tab
+        logResultsDump(task.prime_url, taskResult);
+
+        console.log(`✅ Results fetched for ${task.prime_url}: Found ${rawSerpItems.length} items, Prime URL rank: ${rankings.length > 0 ? rankings[0].rank : 'Not found'}`);
+
         results.push({
           ...task,
           rankings: rankings,
           status: 'completed'
         });
       } else {
+        // Log no results to audit
+        console.log(`⚠️ No results found for ${task.prime_url}: ${task.taskId}`);
+
         results.push({
           ...task,
           rankings: [],
@@ -421,6 +564,10 @@ function fetchResultsFromDataForSEO(taskIds) {
 
     } catch (error) {
       console.error(`Error fetching results for task ${task.taskId}:`, error);
+
+      // Log error to audit
+      console.error(`❌ Failed to fetch results for ${task.prime_url}: ${error.message}`);
+
       results.push({
         ...task,
         rankings: [],
@@ -434,18 +581,20 @@ function fetchResultsFromDataForSEO(taskIds) {
 }
 
 /**
- * Extracts ranking data from SERP results
- * (Adapted from landThePlane.js)
+ * Extracts ranking data from SERP results, looking for specific prime_url
+ * @param {Array} serpResults - Raw SERP results from DataForSEO
+ * @param {string} primeUrl - The specific URL we want to find in rankings
+ * @returns {Array} Array of ranking objects with rank and URL (only for the prime_url)
  */
-function extractRankingData(serpResults) {
+function extractRankingData(serpResults, primeUrl) {
   const rankings = [];
 
   for (const result of serpResults) {
     if (result.items && Array.isArray(result.items)) {
       for (const item of result.items) {
         if (item.type === "organic" && item.rank_group && item.url) {
-          // Filter for aaacwildliferemoval.com domain
-          if (item.url.includes('aaacwildliferemoval.com')) {
+          // Look for exact match of prime_url
+          if (item.url === primeUrl) {
             rankings.push({
               rank: item.rank_group,
               url: item.url
@@ -508,6 +657,44 @@ function checkJobStatus() {
     `Found ${taskIds.length} active jobs.\\n\\nIf you submitted jobs 2-5 minutes ago, they should be ready.\\n\\nClick "Get Results" to fetch them.`,
     SpreadsheetApp.getUi().ButtonSet.OK
   );
+}
+
+/**
+ * Opens the submit requests sheet for viewing
+ */
+function viewSubmitRequests() {
+  try {
+    const sheet = getSubmitRequestsSheet();
+    sheet.activate();
+
+    SpreadsheetApp.getUi().alert(
+      '📤 Submit Requests Log',
+      `Submit requests log opened! This sheet shows all requests sent to DataForSEO.\\n\\nColumns:\\n- Prime URL: The specific URL being tracked\\n- Request Data: The complete request payload`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to open submit requests: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * Opens the results dump sheet for viewing
+ */
+function viewResultsDump() {
+  try {
+    const sheet = getResultsDumpSheet();
+    sheet.activate();
+
+    SpreadsheetApp.getUi().alert(
+      '📥 Results Dump',
+      `Results dump opened! This sheet shows all raw responses from DataForSEO.\\n\\nColumns:\\n- Prime URL: The specific URL being tracked\\n- Raw DataForSEO Response: Complete response including all SERP data`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to open results dump: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
 }
 
 /**
