@@ -130,6 +130,60 @@ Core files:
 ✅ **Historical Tracking** - Multiple ranking checks create new columns automatically
 ✅ **Secure** - API credentials stored in Script Properties
 ✅ **User Friendly** - Custom menu with clear workflow
+✅ **Two-Tab Audit System** - Implemented and working perfectly
+✅ **Prime URL Tracking** - Exact URL matching verified and tested
+✅ **Row Indexing** - Fixed alignment issue, rankings appear in correct rows
+
+## 📝 Recent Development Progress
+
+### Latest Session Summary (2025-09-29)
+**Completed major audit system overhaul:**
+
+1. **Two-Tab Audit Implementation**
+   - Replaced single `audit_log` with separate `submit_requests` and `results_dump` tabs
+   - Clean separation: requests in one tab, raw DataForSEO responses in another
+   - Added dedicated menu options: "View Submit Requests" and "View Results Dump"
+
+2. **Prime URL Enhancement**
+   - Added Column F (prime_url) for manual entry of specific URLs to track
+   - Updated ranking logic to match exact URLs instead of domain-wide matching
+   - Critical for multi-location business with specific service pages per city
+
+3. **Bug Fixes**
+   - Fixed row indexing issue where rankings were appearing in row 3 instead of row 2
+   - Corrected loop inconsistency between `buildPreflightFromSheet` and `getTaskIdsFromSheet`
+   - Both functions now properly start at `i = 1` for consistent row mapping
+
+4. **Code Quality**
+   - Removed all `logAuditEntry` references and replaced with new logging functions
+   - Added `logSubmitRequest()` and `logResultsDump()` for clean audit trail
+   - Updated custom menu with new audit viewing options
+
+### System Architecture Details
+```
+rankmonitor tab (main data):
+A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G-onwards: Results
+
+submit_requests tab (audit):
+A: Prime URL | B: Request Data (JSON)
+
+results_dump tab (audit):
+A: Prime URL | B: Raw DataForSEO Response (JSON)
+```
+
+### Testing Status
+- ✅ Submit jobs works correctly with prime_url logging
+- ✅ Get results works correctly with exact URL matching
+- ✅ Rankings appear in correct rows (fixed indexing bug)
+- ✅ Audit tabs populate with proper request/response data
+- ✅ Custom menu functions work as expected
+
+### Next Potential Features
+- Consider adding bulk operations for multiple keyword/location combinations
+- Potential integration with more SERP data points (featured snippets, local pack, etc.)
+- Export functionality for historical data analysis
+
+**Repository**: Last updated commit `b33b45c` with full two-tab audit system
 
 ## 🔄 Migration from v1
 

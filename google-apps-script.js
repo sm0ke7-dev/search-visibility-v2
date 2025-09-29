@@ -487,7 +487,7 @@ function getTaskIdsFromSheet() {
   }
 
   // Read task IDs from the found column
-  for (let i = 2; i < data.length; i++) { // Start from row 2 (skip header rows)
+  for (let i = 1; i < data.length; i++) { // Start from row 1 (skip header row)
     const taskId = data[i][mostRecentTaskCol];
     if (taskId && taskId.toString().trim() !== '') {
       taskIds.push({
