@@ -53,20 +53,14 @@ const BASE_COLUMNS = {
 };
 
 /**
- * Finds the next set of empty columns for new ranking check
- * Returns the column indices for Task ID, Rank, and Date
+ * Returns the fixed columns for ranking data (always overwrites same columns)
+ * Returns the column indices for Rank and URL
  */
 function findNextEmptyColumns() {
-  const sheet = getRankMonitorSheet();
-  const lastColumn = sheet.getLastColumn();
-
-  // Start looking after the base columns (A-E)
-  let nextCol = Math.max(BASE_COLUMNS.FIRST_DATA_COL, lastColumn);
-
+  // Always use the same columns (G and H) - overwrite previous data
   return {
-    TASK_ID: nextCol,
-    RANK: nextCol + 1,
-    DATE: nextCol + 2
+    RANK: BASE_COLUMNS.FIRST_DATA_COL,     // Column G
+    URL: BASE_COLUMNS.FIRST_DATA_COL + 1   // Column H
   };
 }
 
@@ -158,8 +152,8 @@ function getRankingResults() {
 
     ui.alert('⏳ Processing...', 'Fetching results from DataForSEO. This may take a moment.', ui.ButtonSet.OK);
 
-    // Phase 1: Read task IDs from sheet
-    const taskIds = getTaskIdsFromSheet();
+    // Phase 1: Read task IDs from temporary storage
+    const taskIds = getStoredTaskIds();
 
     if (taskIds.length === 0) {
       ui.alert('⚠️ No Jobs Found', 'No task IDs found. Please run "Submit Ranking Jobs" first.', ui.ButtonSet.OK);
@@ -172,10 +166,13 @@ function getRankingResults() {
     // Phase 3: Write results back to sheet
     writeResultsToSheet(results);
 
+    // Clear stored task IDs after successful retrieval
+    clearStoredTaskIds();
+
     // Show success message
     ui.alert(
       '✅ Results Updated Successfully!',
-      `Ranking data has been updated in the sheet.\\n\\nCheck columns T, U, V for new rankings.`,
+      `Ranking data has been updated in the sheet.\\n\\nCheck the latest column for new rankings.`,
       ui.ButtonSet.OK
     );
 
@@ -431,79 +428,44 @@ function submitJobsToDataForSEO(preflightData) {
 }
 
 /**
- * Writes task IDs back to the rankmonitor sheet
+ * Writes headers and stores task IDs temporarily
  */
 function writeTaskIdsToSheet(taskResults) {
   const sheet = getRankMonitorSheet();
   const columns = findNextEmptyColumns();
 
-  // Add header for this check if needed
+  // Add headers for this check
   const headerRow = 1;
   const timestamp = new Date().toLocaleDateString();
 
-  sheet.getRange(headerRow, columns.TASK_ID + 1).setValue(`Task ID ${timestamp}`);
   sheet.getRange(headerRow, columns.RANK + 1).setValue(`Rank ${timestamp}`);
-  sheet.getRange(headerRow, columns.DATE + 1).setValue(`Date ${timestamp}`);
+  sheet.getRange(headerRow, columns.URL + 1).setValue(`URL ${timestamp}`);
 
+  // Store column info and store task IDs temporarily
   for (const [office, items] of Object.entries(taskResults)) {
     for (const item of items) {
       if (item.task_id && item.rowIndex) {
-        // Write task ID to the next empty column
-        sheet.getRange(item.rowIndex + 1, columns.TASK_ID + 1).setValue(item.task_id);
+        item.rankColumn = columns.RANK;
+        item.urlColumn = columns.URL;
       }
     }
   }
+  
+  // Store task IDs temporarily for later retrieval
+  storeTaskIds(taskResults);
 }
 
 /**
- * Reads task IDs from the most recent column in the rankmonitor sheet
+ * Gets task IDs from temporary storage (since we no longer store them in the sheet)
+ * This will need to be called immediately after job submission
  */
 function getTaskIdsFromSheet() {
-  const sheet = getRankMonitorSheet();
-  const data = sheet.getDataRange().getValues();
-  const taskIds = [];
-
-  // Find the most recent Task ID column (rightmost one)
-  let mostRecentTaskCol = -1;
-
-  // Look through all columns starting from F to find Task ID columns
-  for (let col = BASE_COLUMNS.FIRST_DATA_COL; col < data[0].length; col++) {
-    // Check if this column has task IDs in header row (row 0) or row 1
-    const headerCell = data[0] && data[0][col] ? data[0][col].toString() : '';
-    const row1Cell = data[1] && data[1][col] ? data[1][col].toString() : '';
-
-    if (headerCell.includes('Task ID') || row1Cell.includes('Task ID')) {
-      mostRecentTaskCol = col;
-    }
-  }
-
-  console.log('Most recent task column:', mostRecentTaskCol);
-  console.log('Total columns:', data[0].length);
-  console.log('Headers:', data[0]);
-
-  if (mostRecentTaskCol === -1) {
-    console.log('No Task ID columns found');
-    return taskIds; // No task IDs found
-  }
-
-  // Read task IDs from the found column
-  for (let i = 1; i < data.length; i++) { // Start from row 1 (skip header row)
-    const taskId = data[i][mostRecentTaskCol];
-    if (taskId && taskId.toString().trim() !== '') {
-      taskIds.push({
-        taskId: taskId,
-        rowIndex: i,
-        keyword: data[i][BASE_COLUMNS.SERVICE],
-        office: data[i][BASE_COLUMNS.OFFICE],
-        target: data[i][BASE_COLUMNS.TARGETS],
-        prime_url: data[i][BASE_COLUMNS.PRIME_URL], // Include prime_url for ranking check
-        taskColumn: mostRecentTaskCol
-      });
-    }
-  }
-
-  console.log('Found task IDs:', taskIds.length);
-  return taskIds;
+  // Since we no longer store task IDs in the sheet, we need to get them from
+  // the temporary storage created during job submission
+  // For now, return empty array - this function needs to be refactored
+  // to work with the new approach where task IDs are managed differently
+  console.log('Task IDs are no longer stored in sheet - using temporary storage');
+  return [];
 }
 
 /**
@@ -529,6 +491,12 @@ function fetchResultsFromDataForSEO(taskIds) {
 
       const responseData = JSON.parse(response.getContentText());
       const taskResult = responseData.tasks[0];
+
+      // Debug: Log the complete response from DataForSEO
+      console.log(`🔍 DataForSEO API Response for ${task.taskId}:`, JSON.stringify(responseData, null, 2));
+      console.log(`📊 Task Result:`, JSON.stringify(taskResult, null, 2));
+      console.log(`🎯 Task Status: ${taskResult.status_message}`);
+      console.log(`📈 Results Length: ${taskResult.result ? taskResult.result.length : 'null'}`);
 
       if (taskResult.result && taskResult.result.length > 0) {
         // Extract ranking data for the specific prime_url
@@ -581,20 +549,30 @@ function fetchResultsFromDataForSEO(taskIds) {
 }
 
 /**
- * Extracts ranking data from SERP results, looking for specific prime_url
+ * Extracts ranking data from SERP results, looking for any aaacwildliferemoval.com domain
  * @param {Array} serpResults - Raw SERP results from DataForSEO
- * @param {string} primeUrl - The specific URL we want to find in rankings
- * @returns {Array} Array of ranking objects with rank and URL (only for the prime_url)
+ * @param {string} primeUrl - The specific URL context (used for logging)
+ * @returns {Array} Array of ranking objects with rank and URL (for any aaacwildliferemoval.com domain)
  */
 function extractRankingData(serpResults, primeUrl) {
   const rankings = [];
+  const targetDomain = 'aaacwildliferemoval.com';
+
+  console.log(`🔍 Searching for ${targetDomain} in SERP results for ${primeUrl}`);
+  console.log(`📊 SERP results structure:`, JSON.stringify(serpResults, null, 2));
 
   for (const result of serpResults) {
     if (result.items && Array.isArray(result.items)) {
-      for (const item of result.items) {
+      console.log(`📋 Found ${result.items.length} items in SERP results`);
+      
+      for (let i = 0; i < result.items.length; i++) {
+        const item = result.items[i];
+        console.log(`🔗 Item ${i+1}: type=${item.type}, rank=${item.rank_group}, url=${item.url}`);
+        
         if (item.type === "organic" && item.rank_group && item.url) {
-          // Look for exact match of prime_url
-          if (item.url === primeUrl) {
+          // Look for any URL containing the target domain
+          if (item.url.includes(targetDomain)) {
+            console.log(`✅ MATCH FOUND! Rank ${item.rank_group}: ${item.url}`);
             rankings.push({
               rank: item.rank_group,
               url: item.url
@@ -605,6 +583,7 @@ function extractRankingData(serpResults, primeUrl) {
     }
   }
 
+  console.log(`📈 Total matches found: ${rankings.length}`);
   return rankings;
 }
 
@@ -613,27 +592,33 @@ function extractRankingData(serpResults, primeUrl) {
  */
 function writeResultsToSheet(results) {
   const sheet = getRankMonitorSheet();
-  const timestamp = new Date();
 
   if (results.length === 0) return;
 
-  // Use the task column from the first result to determine where to write
-  const taskColumn = results[0].taskColumn;
-  const rankColumn = taskColumn + 1;
-  const dateColumn = taskColumn + 2;
+  // Use the columns from the first result to determine where to write
+  const rankColumn = results[0].rankColumn || findNextEmptyColumns().RANK;
+  const urlColumn = results[0].urlColumn || findNextEmptyColumns().URL;
 
   for (const result of results) {
     const row = result.rowIndex + 1;
 
-    // Get best ranking (lowest rank number)
+    // Get best ranking (lowest rank number) and corresponding URL
     let newRank = null;
+    let rankingUrl = null;
+    
     if (result.rankings.length > 0) {
-      newRank = Math.min(...result.rankings.map(r => r.rank));
+      // Find the ranking with the lowest rank number (best position)
+      const bestRanking = result.rankings.reduce((best, current) => 
+        current.rank < best.rank ? current : best
+      );
+      
+      newRank = bestRanking.rank;
+      rankingUrl = bestRanking.url;
     }
 
-    // Write to the corresponding rank and date columns
+    // Write to both ranking and URL columns
     sheet.getRange(row, rankColumn + 1).setValue(newRank || 'Not Found');
-    sheet.getRange(row, dateColumn + 1).setValue(timestamp);
+    sheet.getRange(row, urlColumn + 1).setValue(rankingUrl || 'Not Found');
   }
 }
 
@@ -645,7 +630,7 @@ function writeResultsToSheet(results) {
  * Checks status of submitted jobs
  */
 function checkJobStatus() {
-  const taskIds = getTaskIdsFromSheet();
+  const taskIds = getStoredTaskIds();
 
   if (taskIds.length === 0) {
     SpreadsheetApp.getUi().alert('No Jobs Found', 'No active jobs to check.', SpreadsheetApp.getUi().ButtonSet.OK);
@@ -698,12 +683,12 @@ function viewResultsDump() {
 }
 
 /**
- * Clears task data from rankmonitor sheet
+ * Clears task data from rankmonitor sheet and temporary storage
  */
 function clearTaskData() {
   const response = SpreadsheetApp.getUi().alert(
     'Clear Task Data',
-    'This will clear all task IDs from the rankmonitor sheet. Continue?',
+    'This will clear all ranking data from the rankmonitor sheet and stored task IDs. Continue?',
     SpreadsheetApp.getUi().ButtonSet.YES_NO
   );
 
@@ -712,14 +697,17 @@ function clearTaskData() {
   const sheet = getRankMonitorSheet();
   const lastRow = sheet.getLastRow();
 
-  // Clear all task data columns (starting from column F)
+  // Clear all ranking data columns (starting from column G)
   const startCol = BASE_COLUMNS.FIRST_DATA_COL + 1; // +1 for 1-based indexing
   const numCols = sheet.getLastColumn() - BASE_COLUMNS.FIRST_DATA_COL;
   if (numCols > 0) {
-    sheet.getRange(2, startCol, lastRow - 1, numCols).clearContent();
+    sheet.getRange(1, startCol, lastRow, numCols).clearContent(); // Clear headers too
   }
+  
+  // Clear stored task IDs
+  clearStoredTaskIds();
 
-  SpreadsheetApp.getUi().alert('✅ Cleared', 'Task data has been cleared from rankmonitor sheet.', SpreadsheetApp.getUi().ButtonSet.OK);
+  SpreadsheetApp.getUi().alert('✅ Cleared', 'Task data and stored task IDs have been cleared.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /**
@@ -743,4 +731,82 @@ function testDataForSEOConnection() {
   } catch (error) {
     SpreadsheetApp.getUi().alert('❌ Connection Error', `Failed to connect: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
+}
+
+// =============================================================================
+// TASK ID STORAGE FUNCTIONS (for temporary storage since we don't store in sheet)
+// =============================================================================
+
+/**
+ * Stores task IDs temporarily in Script Properties
+ */
+function storeTaskIds(taskResults) {
+  const taskData = [];
+  
+  for (const [office, items] of Object.entries(taskResults)) {
+    for (const item of items) {
+      if (item.task_id && item.rowIndex) {
+        taskData.push({
+          taskId: item.task_id,
+          rowIndex: item.rowIndex,
+          keyword: item.service,
+          office: office,
+          target: item.location,
+          prime_url: item.prime_url,
+          rankColumn: item.rankColumn,
+          urlColumn: item.urlColumn
+        });
+      }
+    }
+  }
+  
+  // Store in Script Properties with timestamp
+  const timestamp = new Date().getTime();
+  PropertiesService.getScriptProperties().setProperty('taskIds', JSON.stringify(taskData));
+  PropertiesService.getScriptProperties().setProperty('taskIds_timestamp', timestamp.toString());
+  
+  console.log(`Stored ${taskData.length} task IDs temporarily`);
+}
+
+/**
+ * Retrieves stored task IDs from Script Properties
+ */
+function getStoredTaskIds() {
+  try {
+    const taskData = PropertiesService.getScriptProperties().getProperty('taskIds');
+    const timestamp = PropertiesService.getScriptProperties().getProperty('taskIds_timestamp');
+    
+    if (!taskData) {
+      console.log('No stored task IDs found');
+      return [];
+    }
+    
+    // Check if data is too old (more than 30 minutes)
+    const currentTime = new Date().getTime();
+    const storedTime = parseInt(timestamp || '0');
+    const maxAge = 30 * 60 * 1000; // 30 minutes
+    
+    if (currentTime - storedTime > maxAge) {
+      console.log('Stored task IDs are too old, clearing them');
+      clearStoredTaskIds();
+      return [];
+    }
+    
+    const parsed = JSON.parse(taskData);
+    console.log(`Retrieved ${parsed.length} stored task IDs`);
+    return parsed;
+    
+  } catch (error) {
+    console.error('Error retrieving stored task IDs:', error);
+    return [];
+  }
+}
+
+/**
+ * Clears stored task IDs from Script Properties
+ */
+function clearStoredTaskIds() {
+  PropertiesService.getScriptProperties().deleteProperty('taskIds');
+  PropertiesService.getScriptProperties().deleteProperty('taskIds_timestamp');
+  console.log('Cleared stored task IDs');
 }
