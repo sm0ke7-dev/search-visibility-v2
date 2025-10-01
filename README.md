@@ -1,6 +1,6 @@
 # Search Visibility v2 - Daily Ranking Monitor
 
-A Google Sheets-integrated ranking tracker that monitors keyword positions daily using DataForSEO's SERP API. Built for wildlife removal service ranking monitoring with historical tracking capabilities.
+A Google Sheets-integrated ranking tracker that monitors keyword positions daily using DataForSEO's SERP API. Built for wildlife removal service ranking monitoring with support for multiple office locations and flexible column structures.
 
 ## 🚀 Features
 
@@ -11,6 +11,7 @@ A Google Sheets-integrated ranking tracker that monitors keyword positions daily
 - **Secure API Storage**: Uses Google Apps Script Properties for API credentials
 - **Mobile-First**: Targets mobile rankings (Android device simulation)
 - **Domain-Wide Tracking**: Tracks rankings for any aaacwildliferemoval.com subdomain
+- **Multi-Office Support**: Separate scripts for different office locations with custom column structures
 - **Complete Audit Trail**: Automatic logging of all API requests and responses for transparency
 
 ## 📊 Workflow
@@ -59,6 +60,31 @@ F: prime_url (https://dallas.aaacwildliferemoval.com/service-area/garland/)
 ```
 
 Results will auto-populate in columns G (Rank) and H (URL).
+
+## 🏢 Multi-Office Setup
+
+The system supports multiple office locations with different column structures:
+
+### Main Office (`rankmonitor` tab)
+```
+A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G: Rank | H: URL
+```
+**Script:** `google-apps-script.js`
+**Menu:** 🎯 Ranking Tracker
+
+### Palm Beaches Office (`palm-beaches` tab)
+```
+A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G: Population | H: Income | I: Rank | J: URL
+```
+**Script:** `google-apps-script-palm-beaches.js`
+**Menu:** 🌴 Palm Beaches Ranking Tracker
+
+### Adding New Offices
+1. Copy `google-apps-script-palm-beaches.js`
+2. Update `SHEET_NAMES.RANK_MONITOR` to your tab name
+3. Adjust `BASE_COLUMNS` for your column structure
+4. Update `FIRST_DATA_COL` to where ranking data should start
+5. Customize menu branding and messages
 
 ## 📈 Current Rankings
 
@@ -124,7 +150,8 @@ Core files:
 - `buildPreflight.js` - Data preparation (adapted for Google Sheets)
 - `buildTakeOff.js` - API job submission
 - `landThePlane.js` - Results retrieval
-- `google-apps-script.js` - Complete Google Sheets integration
+- `google-apps-script.js` - Main office Google Sheets integration (rankmonitor tab)
+- `google-apps-script-palm-beaches.js` - Palm Beaches office integration (palm-beaches tab)
 
 ## 🏗️ Architecture
 
@@ -144,6 +171,7 @@ Core files:
 ✅ **User Friendly** - Custom menu with clear workflow
 ✅ **Two-Tab Audit System** - Implemented and working perfectly
 ✅ **Domain-Wide Tracking** - Finds best ranking for any aaacwildliferemoval.com subdomain
+✅ **Multi-Office Support** - Separate scripts for different office locations and column structures
 ✅ **Row Indexing** - Fixed alignment issue, rankings appear in correct rows
 
 ## 📝 Recent Development Progress
@@ -178,16 +206,27 @@ Core files:
    - Manual control remains fully functional alongside automation
    - Smart error handling and console logging for unattended operation
 
+6. **Multi-Office Support (2025-10-01)**
+   - Created `google-apps-script-palm-beaches.js` for Palm Beaches office
+   - Supports flexible column structures (added Population/Income columns G & H)
+   - Ranking data moves to columns I & J to accommodate additional data
+   - Separate audit tabs and task storage to prevent conflicts between offices
+   - Palm Beaches specific branding and menu (🌴 Palm Beaches Ranking Tracker)
+
 ### System Architecture Details
+
+**Main Office (rankmonitor tab):**
 ```
-rankmonitor tab (main data):
-A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G: Rank | H: URL
+rankmonitor tab: A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G: Rank | H: URL
+submit_requests tab: A: Prime URL | B: Request Data (JSON)
+results_dump tab: A: Prime URL | B: Raw DataForSEO Response (JSON)
+```
 
-submit_requests tab (audit):
-A: Prime URL | B: Request Data (JSON)
-
-results_dump tab (audit):
-A: Prime URL | B: Raw DataForSEO Response (JSON)
+**Palm Beaches Office (palm-beaches tab):**
+```
+palm-beaches tab: A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G: Population | H: Income | I: Rank | J: URL
+pb_submit_requests tab: A: Prime URL | B: Request Data (JSON)
+pb_results_dump tab: A: Prime URL | B: Raw DataForSEO Response (JSON)
 ```
 
 ### Testing Status
@@ -201,13 +240,16 @@ A: Prime URL | B: Raw DataForSEO Response (JSON)
 - ✅ Daily automation setup and management working correctly
 - ✅ Manual and automated workflows operate independently
 - ✅ Error handling and logging optimized for unattended operation
+- ✅ Palm Beaches multi-office setup working with Population/Income columns
+- ✅ Separate audit tabs and task storage prevent office conflicts
+- ✅ Flexible column structure supports different office data requirements
 
 ### Next Potential Features
 - Consider adding bulk operations for multiple keyword/location combinations
 - Potential integration with more SERP data points (featured snippets, local pack, etc.)
 - Export functionality for historical data analysis
 
-**Repository**: Last updated with automated daily ranking checks and simplified domain-wide matching
+**Repository**: Last updated with multi-office support, automated daily ranking checks, and flexible column structures
 
 ## 🔄 Migration from v1
 
