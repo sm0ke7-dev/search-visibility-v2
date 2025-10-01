@@ -5,26 +5,34 @@ A Google Sheets-integrated ranking tracker that monitors keyword positions daily
 ## 🚀 Features
 
 - **Google Sheets Integration**: Custom menu with one-click ranking checks
-- **Historical Tracking**: Automatically adds new columns for each check (never overwrites data)
-- **Two-Phase Workflow**: Submit jobs → Wait 2-5 minutes → Get results
+- **Current Rankings**: Always shows latest rankings in fixed columns (overwrites previous data)
+- **Automated Daily Checks**: Set up time-driven triggers for hands-free daily monitoring
+- **Two-Phase Workflow**: Submit jobs → Wait 2-5 minutes → Get results (manual or automated)
 - **Secure API Storage**: Uses Google Apps Script Properties for API credentials
 - **Mobile-First**: Targets mobile rankings (Android device simulation)
-- **Specific URL Tracking**: Tracks rankings for exact prime_url instead of domain-wide
+- **Domain-Wide Tracking**: Tracks rankings for any aaacwildliferemoval.com subdomain
 - **Complete Audit Trail**: Automatic logging of all API requests and responses for transparency
 
 ## 📊 Workflow
 
-### Phase 1: Submit Ranking Jobs
+### Manual Workflow
+**Phase 1: Submit Ranking Jobs**
 1. Click **🎯 Ranking Tracker** → **📤 Submit Ranking Jobs**
 2. Script reads Office, Targets, service, lat, long from "rankmonitor" sheet
 3. Submits jobs to DataForSEO API
-4. Stores task IDs in next available column
+4. Stores task IDs temporarily in Script Properties
 
-### Phase 2: Get Results (2-5 minutes later)
+**Phase 2: Get Results (2-5 minutes later)**
 1. Click **🎯 Ranking Tracker** → **📥 Get Results**
 2. Fetches results using stored task IDs
-3. Writes rankings and timestamps to sheet
-4. Creates historical columns for tracking over time
+3. Writes current rankings to fixed columns G and H (overwrites previous data)
+
+### Automated Workflow
+**Set Once, Run Daily:**
+1. Click **🎯 Ranking Tracker** → **🤖 Setup Daily Automation**
+2. Follow guided setup to choose your preferred time (e.g., 9:00 AM)
+3. System automatically runs both phases daily with 5-minute wait between them
+4. Same ranking data appears in columns G and H, completely hands-free!
 
 ## 🛠️ Setup
 
@@ -50,18 +58,17 @@ E: long      (-96.63675497)
 F: prime_url (https://dallas.aaacwildliferemoval.com/service-area/garland/)
 ```
 
-Results will auto-populate in columns G, H, I, J, K, L, etc.
+Results will auto-populate in columns G (Rank) and H (URL).
 
-## 📈 Historical Tracking
+## 📈 Current Rankings
 
-Each ranking check creates 3 new columns:
+Each ranking check overwrites the fixed columns:
 ```
-Check 1: G (Task ID) | H (Rank) | I (Date)
-Check 2: J (Task ID) | K (Rank) | L (Date)
-Check 3: M (Task ID) | N (Rank) | O (Date)
+Column G: Rank (best position found for any aaacwildliferemoval.com subdomain)
+Column H: URL (the specific URL that achieved that ranking)
 ```
 
-Perfect for tracking ranking improvements over time! 📊
+Results are always current - previous data is overwritten for simplicity! 📊
 
 ## 📋 Two-Tab Audit System
 
@@ -79,7 +86,7 @@ Logs all raw responses from DataForSEO when you click "Get Results":
 
 ### Benefits:
 - 🔍 **Debug rankings**: See exactly what DataForSEO returned in raw format
-- 🎯 **Prime URL verification**: Confirm rankings are for your exact URLs
+- 🎯 **Domain verification**: Confirm rankings are for aaacwildliferemoval.com subdomains
 - 🧹 **Clean separation**: Request data and response data in separate tabs
 - 📊 **Complete transparency**: Full audit trail of all API interactions
 
@@ -95,6 +102,10 @@ Once installed, you'll see this menu in Google Sheets:
 ├── 📋 View Submit Requests
 ├── 📋 View Results Dump
 ├── 🧹 Clear Task Data
+├── ────────────────
+├── 🤖 Setup Daily Automation
+├── 🔕 Disable Automation
+├── 🧪 Test Daily Check
 ├── ────────────────
 └── ⚙️ Test Connection
 ```
@@ -118,51 +129,59 @@ Core files:
 ## 🏗️ Architecture
 
 **Original (v1)**: Complex 3-phase Node.js pipeline with JSON files
-**v2 Upgrade**: Google Sheets integration with historical tracking
+**v2 Upgrade**: Google Sheets integration with current ranking display
 
 - **Read**: Google Sheets data (Office/Targets/service/coordinates)
 - **Process**: DataForSEO API integration with 2-phase workflow
-- **Write**: Historical columns with timestamps
+- **Write**: Current rankings to fixed columns G and H
 
 ## 🎉 Status
 
 ✅ **Production Ready** - Successfully tested with Google Sheets integration
-✅ **Historical Tracking** - Multiple ranking checks create new columns automatically
+✅ **Current Rankings** - Always displays latest rankings in fixed columns
+✅ **Automated Daily Checks** - Time-driven triggers for hands-free monitoring
 ✅ **Secure** - API credentials stored in Script Properties
 ✅ **User Friendly** - Custom menu with clear workflow
 ✅ **Two-Tab Audit System** - Implemented and working perfectly
-✅ **Prime URL Tracking** - Exact URL matching verified and tested
+✅ **Domain-Wide Tracking** - Finds best ranking for any aaacwildliferemoval.com subdomain
 ✅ **Row Indexing** - Fixed alignment issue, rankings appear in correct rows
 
 ## 📝 Recent Development Progress
 
-### Latest Session Summary (2025-09-29)
-**Completed major audit system overhaul:**
+### Latest Session Summary (2025-10-01)
+**Reverted to simplified approach for daily monitoring:**
 
-1. **Two-Tab Audit Implementation**
-   - Replaced single `audit_log` with separate `submit_requests` and `results_dump` tabs
-   - Clean separation: requests in one tab, raw DataForSEO responses in another
-   - Added dedicated menu options: "View Submit Requests" and "View Results Dump"
+1. **Domain-Wide Matching**
+   - Reverted from exact prime_url matching back to domain-wide matching
+   - Now searches for any URL containing `aaacwildliferemoval.com`
+   - Returns best ranking found across all subdomains for each keyword
 
-2. **Prime URL Enhancement**
-   - Added Column F (prime_url) for manual entry of specific URLs to track
-   - Updated ranking logic to match exact URLs instead of domain-wide matching
-   - Critical for multi-location business with specific service pages per city
+2. **Fixed Column Approach**
+   - Changed from historical tracking (new columns each run) to fixed columns G and H
+   - Always overwrites previous data for simplicity
+   - Column G: Best rank found, Column H: URL that achieved that rank
 
-3. **Bug Fixes**
-   - Fixed row indexing issue where rankings were appearing in row 3 instead of row 2
-   - Corrected loop inconsistency between `buildPreflightFromSheet` and `getTaskIdsFromSheet`
-   - Both functions now properly start at `i = 1` for consistent row mapping
+3. **Temporary Task Storage**
+   - Task IDs now stored in Script Properties instead of sheet columns
+   - Automatic cleanup after 30 minutes to prevent stale data
+   - Cleaner sheet layout without task ID columns
 
-4. **Code Quality**
-   - Removed all `logAuditEntry` references and replaced with new logging functions
-   - Added `logSubmitRequest()` and `logResultsDump()` for clean audit trail
-   - Updated custom menu with new audit viewing options
+4. **Streamlined for Daily Use**
+   - Optimized for daily ranking checks where current data is more important than history
+   - Simplified workflow: submit jobs → wait → get current rankings
+   - Audit tabs still maintain complete transparency of API interactions
+
+5. **Added Daily Automation (2025-10-01)**
+   - Implemented time-driven triggers for automated daily ranking checks
+   - `dailyRankingCheck()` function runs complete workflow (submit → wait 5 min → get results)
+   - New menu options: Setup Daily Automation, Disable Automation, Test Daily Check
+   - Manual control remains fully functional alongside automation
+   - Smart error handling and console logging for unattended operation
 
 ### System Architecture Details
 ```
 rankmonitor tab (main data):
-A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G-onwards: Results
+A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G: Rank | H: URL
 
 submit_requests tab (audit):
 A: Prime URL | B: Request Data (JSON)
@@ -173,17 +192,22 @@ A: Prime URL | B: Raw DataForSEO Response (JSON)
 
 ### Testing Status
 - ✅ Submit jobs works correctly with prime_url logging
-- ✅ Get results works correctly with exact URL matching
+- ✅ Get results works correctly with domain-wide matching
 - ✅ Rankings appear in correct rows (fixed indexing bug)
+- ✅ Fixed columns G and H overwrite correctly
 - ✅ Audit tabs populate with proper request/response data
 - ✅ Custom menu functions work as expected
+- ✅ Task ID temporary storage working with 30-minute cleanup
+- ✅ Daily automation setup and management working correctly
+- ✅ Manual and automated workflows operate independently
+- ✅ Error handling and logging optimized for unattended operation
 
 ### Next Potential Features
 - Consider adding bulk operations for multiple keyword/location combinations
 - Potential integration with more SERP data points (featured snippets, local pack, etc.)
 - Export functionality for historical data analysis
 
-**Repository**: Last updated commit `b33b45c` with full two-tab audit system
+**Repository**: Last updated with automated daily ranking checks and simplified domain-wide matching
 
 ## 🔄 Migration from v1
 

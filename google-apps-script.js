@@ -82,6 +82,10 @@ function onOpen() {
     .addItem('📋 View Results Dump', 'viewResultsDump')
     .addItem('🧹 Clear Task Data', 'clearTaskData')
     .addSeparator()
+    .addItem('🤖 Setup Daily Automation', 'setupDailyAutomation')
+    .addItem('🔕 Disable Automation', 'disableAutomation')
+    .addItem('🧪 Test Daily Check', 'testDailyRankingCheck')
+    .addSeparator()
     .addItem('⚙️ Test Connection', 'testDataForSEOConnection')
     .addToUi();
 }
@@ -180,6 +184,102 @@ function getRankingResults() {
     SpreadsheetApp.getUi().alert('❌ Error', `Failed to get results: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
     console.error('Get results error:', error);
   }
+}
+
+// =============================================================================
+// AUTOMATED RANKING CHECK FUNCTIONS
+// =============================================================================
+
+/**
+ * Daily automated ranking check - runs both submit and get results with delay
+ * This function is designed to be called by time-driven triggers
+ */
+function dailyRankingCheck() {
+  try {
+    console.log('🤖 Starting automated daily ranking check...');
+
+    // Phase 1: Submit ranking jobs
+    submitRankingJobsAutomated();
+
+    // Phase 2: Wait 5 minutes for DataForSEO to process
+    console.log('⏳ Waiting 5 minutes for DataForSEO to process jobs...');
+    Utilities.sleep(5 * 60 * 1000); // 5 minutes
+
+    // Phase 3: Get results
+    getRankingResultsAutomated();
+
+    console.log('✅ Automated daily ranking check completed successfully!');
+
+  } catch (error) {
+    console.error('❌ Automated daily ranking check failed:', error);
+
+    // Optional: Send email notification about the failure
+    // You can uncomment and customize this if you want email alerts
+    /*
+    try {
+      MailApp.sendEmail({
+        to: 'your-email@example.com',
+        subject: '❌ Daily Ranking Check Failed',
+        body: `The automated daily ranking check failed with error: ${error.message}\n\nPlease check the Google Apps Script logs for more details.`
+      });
+    } catch (emailError) {
+      console.error('Failed to send error notification email:', emailError);
+    }
+    */
+  }
+}
+
+/**
+ * Automated version of submitRankingJobs (no UI dialogs)
+ * Used by daily automation - same logic as manual version but without user prompts
+ */
+function submitRankingJobsAutomated() {
+  console.log('📤 Starting automated job submission...');
+
+  // Phase 1: Get sheet data and run preflight
+  const sheetData = getSheetData();
+  const preflightData = buildPreflightFromSheet(sheetData);
+
+  // Phase 2: Submit jobs to DataForSEO (Takeoff)
+  const taskResults = submitJobsToDataForSEO(preflightData);
+
+  // Phase 3: Store task IDs back in sheet
+  writeTaskIdsToSheet(taskResults);
+
+  // Log success
+  const jobCount = Object.values(taskResults).flat().length;
+  console.log(`✅ Automated job submission completed: ${jobCount} jobs submitted`);
+
+  return jobCount;
+}
+
+/**
+ * Automated version of getRankingResults (no UI dialogs)
+ * Used by daily automation - same logic as manual version but without user prompts
+ */
+function getRankingResultsAutomated() {
+  console.log('📥 Starting automated results retrieval...');
+
+  // Phase 1: Read task IDs from temporary storage
+  const taskIds = getStoredTaskIds();
+
+  if (taskIds.length === 0) {
+    console.log('⚠️ No task IDs found for automated results retrieval');
+    return;
+  }
+
+  // Phase 2: Fetch results from DataForSEO
+  const results = fetchResultsFromDataForSEO(taskIds);
+
+  // Phase 3: Write results back to sheet
+  writeResultsToSheet(results);
+
+  // Clear stored task IDs after successful retrieval
+  clearStoredTaskIds();
+
+  console.log('✅ Automated results retrieval completed successfully!');
+
+  return results.length;
 }
 
 // =============================================================================
@@ -809,4 +909,136 @@ function clearStoredTaskIds() {
   PropertiesService.getScriptProperties().deleteProperty('taskIds');
   PropertiesService.getScriptProperties().deleteProperty('taskIds_timestamp');
   console.log('Cleared stored task IDs');
+}
+
+// =============================================================================
+// AUTOMATION SETUP AND MANAGEMENT FUNCTIONS
+// =============================================================================
+
+/**
+ * Sets up daily automation trigger - user chooses the time
+ */
+function setupDailyAutomation() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+
+    // Show information about automation
+    const setupResponse = ui.alert(
+      '🤖 Setup Daily Automation',
+      'This will create a daily trigger to automatically check rankings.\\n\\nAfter clicking OK, you will be shown instructions to set up the time trigger manually in the Apps Script interface.',
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (setupResponse !== ui.Button.OK) return;
+
+    // Check if automation is already set up
+    const existingTriggers = ScriptApp.getProjectTriggers();
+    const dailyTrigger = existingTriggers.find(trigger =>
+      trigger.getHandlerFunction() === 'dailyRankingCheck'
+    );
+
+    if (dailyTrigger) {
+      ui.alert(
+        '⚠️ Automation Already Active',
+        'Daily automation is already set up!\\n\\nIf you want to change the time, first click "Disable Automation", then set it up again.',
+        ui.ButtonSet.OK
+      );
+      return;
+    }
+
+    // Show setup instructions
+    ui.alert(
+      '📋 Setup Instructions',
+      'To complete the setup:\\n\\n1. Go to Apps Script (script.google.com)\\n2. Open your project\\n3. Click "Triggers" (clock icon on left)\\n4. Click "+ Add Trigger"\\n5. Choose:\\n   - Function: dailyRankingCheck\\n   - Event source: Time-driven\\n   - Type: Day timer\\n   - Time: Pick your preferred time\\n6. Click "Save"\\n\\nRecommended time: 9:00 AM (after business hours start)',
+      ui.ButtonSet.OK
+    );
+
+    // Store automation preference
+    PropertiesService.getScriptProperties().setProperty('automation_enabled', 'true');
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to setup automation: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    console.error('Setup automation error:', error);
+  }
+}
+
+/**
+ * Disables daily automation by removing triggers
+ */
+function disableAutomation() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+
+    const response = ui.alert(
+      '🔕 Disable Automation',
+      'This will remove the daily automation trigger. You can still run rankings manually.\\n\\nContinue?',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) return;
+
+    // Remove all triggers for dailyRankingCheck function
+    const triggers = ScriptApp.getProjectTriggers();
+    let removedCount = 0;
+
+    for (const trigger of triggers) {
+      if (trigger.getHandlerFunction() === 'dailyRankingCheck') {
+        ScriptApp.deleteTrigger(trigger);
+        removedCount++;
+      }
+    }
+
+    // Remove automation preference
+    PropertiesService.getScriptProperties().deleteProperty('automation_enabled');
+
+    if (removedCount > 0) {
+      ui.alert(
+        '✅ Automation Disabled',
+        `Removed ${removedCount} automation trigger(s).\\n\\nDaily automation is now disabled. You can still run rankings manually using the menu.`,
+        ui.ButtonSet.OK
+      );
+    } else {
+      ui.alert(
+        'ℹ️ No Automation Found',
+        'No active automation triggers were found to remove.',
+        ui.ButtonSet.OK
+      );
+    }
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to disable automation: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    console.error('Disable automation error:', error);
+  }
+}
+
+/**
+ * Tests the daily ranking check function manually
+ */
+function testDailyRankingCheck() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+
+    const response = ui.alert(
+      '🧪 Test Daily Check',
+      'This will run the complete automated daily ranking check process.\\n\\nThis includes:\\n- Submit jobs\\n- Wait 5 minutes\\n- Get results\\n\\nThis may take 6-7 minutes total. Continue?',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) return;
+
+    ui.alert('⏳ Starting Test...', 'Running automated daily check. This will take about 6-7 minutes.\\n\\nYou can monitor progress in the Apps Script logs.', ui.ButtonSet.OK);
+
+    // Run the daily check
+    dailyRankingCheck();
+
+    ui.alert(
+      '✅ Test Completed!',
+      'Daily ranking check test completed successfully!\\n\\nCheck your sheet for updated rankings.',
+      ui.ButtonSet.OK
+    );
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('❌ Test Failed', `Daily check test failed: ${error.message}\\n\\nCheck the Apps Script logs for more details.`, SpreadsheetApp.getUi().ButtonSet.OK);
+    console.error('Test daily check error:', error);
+  }
 }
