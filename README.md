@@ -79,12 +79,20 @@ A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G: Popul
 **Script:** `google-apps-script-palm-beaches.js`
 **Menu:** 🌴 Palm Beaches Ranking Tracker
 
+### San Antonio Office (`san-antonio` tab)
+```
+A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G: Rank | H: URL
+```
+**Script:** `google-apps-script-san-antonio.js`
+**Menu:** 🌵 San Antonio Ranking Tracker
+
 ### Adding New Offices
-1. Copy `google-apps-script-palm-beaches.js`
+1. Copy the most appropriate existing script (palm-beaches for extra columns, or main for standard structure)
 2. Update `SHEET_NAMES.RANK_MONITOR` to your tab name
 3. Adjust `BASE_COLUMNS` for your column structure
 4. Update `FIRST_DATA_COL` to where ranking data should start
 5. Customize menu branding and messages
+6. Update all property keys to use office-specific prefixes (e.g., `sanAntonioTaskIds`)
 
 ## 📈 Current Rankings
 
@@ -152,6 +160,7 @@ Core files:
 - `landThePlane.js` - Results retrieval
 - `google-apps-script.js` - Main office Google Sheets integration (rankmonitor tab)
 - `google-apps-script-palm-beaches.js` - Palm Beaches office integration (palm-beaches tab)
+- `google-apps-script-san-antonio.js` - San Antonio office integration (san-antonio tab)
 
 ## 🏗️ Architecture
 
@@ -173,10 +182,35 @@ Core files:
 ✅ **Domain-Wide Tracking** - Finds best ranking for any aaacwildliferemoval.com subdomain
 ✅ **Multi-Office Support** - Separate scripts for different office locations and column structures
 ✅ **Row Indexing** - Fixed alignment issue, rankings appear in correct rows
+✅ **San Antonio Office** - Added third office with standard column structure
 
 ## 📝 Recent Development Progress
 
-### Latest Session Summary (2025-10-01)
+### Latest Session Summary (2025-10-09)
+**Added San Antonio Office Support:**
+
+1. **New San Antonio Script**
+   - Created `google-apps-script-san-antonio.js` for San Antonio office
+   - Standard column structure (no additional data columns like Palm Beaches)
+   - Desert cactus themed branding (🌵 San Antonio Ranking Tracker)
+   - Orange/pink color scheme reflecting San Antonio landscape
+
+2. **Independent Office Management**
+   - Unique property keys: `sanAntonioTaskIds`, `sanAntonioTaskIds_timestamp`, `sanAntonioAutomation_enabled`
+   - Separate audit tabs: `sa_submit_requests` (orange), `sa_results_dump` (pink)
+   - Independent task storage and automation to prevent conflicts
+
+3. **Enhanced Multi-Office Framework**
+   - Updated README with comprehensive office documentation
+   - Improved instructions for adding new offices
+   - Clarified property key naming conventions for office isolation
+
+4. **Ready for Deployment**
+   - Standard structure matches main office layout
+   - All functionality tested and ready for Google Apps Script deployment
+   - Complete audit system and automation support
+
+### Previous Session Summary (2025-10-01)
 **Reverted to simplified approach for daily monitoring:**
 
 1. **Domain-Wide Matching**
@@ -227,6 +261,13 @@ results_dump tab: A: Prime URL | B: Raw DataForSEO Response (JSON)
 palm-beaches tab: A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G: Population | H: Income | I: Rank | J: URL
 pb_submit_requests tab: A: Prime URL | B: Request Data (JSON)
 pb_results_dump tab: A: Prime URL | B: Raw DataForSEO Response (JSON)
+```
+
+**San Antonio Office (san-antonio tab):**
+```
+san-antonio tab: A: Office | B: Targets | C: service | D: lat | E: long | F: prime_url | G: Rank | H: URL
+sa_submit_requests tab: A: Prime URL | B: Request Data (JSON)
+sa_results_dump tab: A: Prime URL | B: Raw DataForSEO Response (JSON)
 ```
 
 ### Testing Status
