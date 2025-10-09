@@ -1,5 +1,5 @@
 /**
- * Google Apps Script for Search Visibility Ranking Tracker - San Antonio Office (Mobile)
+ * Google Apps Script for Search Visibility Ranking Tracker - San Antonio Office
  *
  * Instructions:
  * 1. Open Google Apps Script (script.google.com)
@@ -41,7 +41,7 @@ const SHEET_NAMES = {
 
 /**
  * Base column configuration for San Antonio sheet
- * Updated for san-antonio tab with Population and Income columns
+ * Standard structure without additional data columns (like Palm Beaches)
  */
 const BASE_COLUMNS = {
   OFFICE: 0,       // Column A
@@ -50,9 +50,7 @@ const BASE_COLUMNS = {
   LAT: 3,          // Column D
   LONG: 4,         // Column E
   PRIME_URL: 5,    // Column F (manual entry - specific page to track)
-  POPULATION: 6,   // Column G - Population data
-  INCOME: 7,       // Column H - Income data
-  FIRST_DATA_COL: 8 // Column I - where ranking data columns start
+  FIRST_DATA_COL: 6 // Column G - where ranking data columns start
 };
 
 /**
@@ -61,10 +59,10 @@ const BASE_COLUMNS = {
  */
 function findNextEmptyColumns() {
   // Always use the same columns - overwrite previous data
-  // Columns I and J (after Population and Income)
+  // Columns G and H (standard structure)
   return {
-    RANK: BASE_COLUMNS.FIRST_DATA_COL,     // Column I (after Population/Income)
-    URL: BASE_COLUMNS.FIRST_DATA_COL + 1   // Column J (after Population/Income)
+    RANK: BASE_COLUMNS.FIRST_DATA_COL,     // Column G
+    URL: BASE_COLUMNS.FIRST_DATA_COL + 1   // Column H
   };
 }
 
@@ -77,7 +75,7 @@ function findNextEmptyColumns() {
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('📱 San Antonio Mobile Ranking Tracker')  // Mobile themed menu
+  ui.createMenu('🌵 San Antonio Ranking Tracker')  // San Antonio themed menu
     .addItem('📤 Submit Ranking Jobs', 'submitRankingJobs')
     .addItem('📥 Get Results', 'getRankingResults')
     .addSeparator()
@@ -542,8 +540,8 @@ function writeTaskIdsToSheet(taskResults) {
   const headerRow = 1;
   const timestamp = new Date().toLocaleDateString();
 
-  sheet.getRange(headerRow, columns.RANK + 1).setValue(`Mobile Ranking ${timestamp}`);
-  sheet.getRange(headerRow, columns.URL + 1).setValue(`Mobile Ranking URL ${timestamp}`);
+  sheet.getRange(headerRow, columns.RANK + 1).setValue(`Rank ${timestamp}`);
+  sheet.getRange(headerRow, columns.URL + 1).setValue(`URL ${timestamp}`);
 
   // Store column info and store task IDs temporarily
   for (const [office, items] of Object.entries(taskResults)) {

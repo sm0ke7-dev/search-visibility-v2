@@ -1,5 +1,5 @@
 /**
- * Google Apps Script for Search Visibility Ranking Tracker
+ * Google Apps Script for Search Visibility Ranking Tracker - Mobile
  *
  * Instructions:
  * 1. Open Google Apps Script (script.google.com)
@@ -73,7 +73,7 @@ function findNextEmptyColumns() {
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('🎯 Ranking Tracker')
+  ui.createMenu('📱 Mobile Ranking Tracker')
     .addItem('📤 Submit Ranking Jobs', 'submitRankingJobs')
     .addItem('📥 Get Results', 'getRankingResults')
     .addSeparator()
@@ -538,8 +538,8 @@ function writeTaskIdsToSheet(taskResults) {
   const headerRow = 1;
   const timestamp = new Date().toLocaleDateString();
 
-  sheet.getRange(headerRow, columns.RANK + 1).setValue(`Rank ${timestamp}`);
-  sheet.getRange(headerRow, columns.URL + 1).setValue(`URL ${timestamp}`);
+  sheet.getRange(headerRow, columns.RANK + 1).setValue(`Mobile Ranking ${timestamp}`);
+  sheet.getRange(headerRow, columns.URL + 1).setValue(`Mobile Ranking URL ${timestamp}`);
 
   // Store column info and store task IDs temporarily
   for (const [office, items] of Object.entries(taskResults)) {
