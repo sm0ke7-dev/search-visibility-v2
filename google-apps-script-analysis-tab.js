@@ -1,5 +1,5 @@
 /**
- * Google Apps Script for Search Visibility Ranking Tracker - Desktop
+ * Google Apps Script for Search Visibility Ranking Tracker - San Antonio Office (Desktop)
  *
  * Instructions:
  * 1. Open Google Apps Script (script.google.com)
@@ -10,7 +10,7 @@
  */
 
 // =============================================================================
-// CONFIGURATION - DESKTOP
+// CONFIGURATION - SAN ANTONIO DESKTOP
 // =============================================================================
 
 /**
@@ -31,16 +31,16 @@ function getDataForSEOConfig() {
 }
 
 /**
- * Sheet configuration - Desktop specific
+ * Sheet configuration - Analysis specific
  */
 const SHEET_NAMES = {
-  RANK_MONITOR: 'rankmonitor',  // Use same sheet as mobile version
-  SUBMIT_REQUESTS: 'desktop_submit_requests',    // Desktop specific audit tabs
-  RESULTS_DUMP: 'desktop_results_dump'
+  RANK_MONITOR: 'analysis',  // Analysis tab
+  SUBMIT_REQUESTS: 'analysis_submit_requests',    // Analysis audit tabs
+  RESULTS_DUMP: 'analysis_results_dump'
 };
 
 /**
- * Base column configuration for rankmonitor sheet
+ * Base column configuration for analysis tab
  * Updated to match actual spreadsheet structure from image
  */
 const BASE_COLUMNS = {
@@ -61,15 +61,15 @@ const BASE_COLUMNS = {
  * Returns the column indices for Rank and URL
  */
 function findNextEmptyColumns() {
-  // Write to columns J and K (after existing data)
+  // Write to columns I and J (after existing data)
   return {
-    RANK: BASE_COLUMNS.FIRST_DATA_COL,     // Column J (after existing data)
-    URL: BASE_COLUMNS.FIRST_DATA_COL + 1   // Column K (after existing data)
+    RANK: BASE_COLUMNS.PRIME_URL,     // Column I (prime URL column)
+    URL: BASE_COLUMNS.FIRST_DATA_COL  // Column J (after existing data)
   };
 }
 
 // =============================================================================
-// CUSTOM MENU - DESKTOP
+// CUSTOM MENU - SAN ANTONIO DESKTOP
 // =============================================================================
 
 /**
@@ -77,7 +77,7 @@ function findNextEmptyColumns() {
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('🖥️ Desktop Ranking Tracker')
+  ui.createMenu('📊 Analysis Ranking Tracker')  // Analysis themed menu
     .addItem('📤 Submit Ranking Jobs', 'submitRankingJobs')
     .addItem('📥 Get Results', 'getRankingResults')
     .addSeparator()
@@ -108,14 +108,14 @@ function submitRankingJobs() {
 
     // Show confirmation dialog
     const response = ui.alert(
-      'Submit Ranking Jobs - Desktop',
-      'This will submit ranking check jobs to DataForSEO (Desktop). Continue?',
+      'Submit Ranking Jobs - Analysis',
+      'This will submit ranking check jobs to DataForSEO for Analysis. Continue?',
       ui.ButtonSet.YES_NO
     );
 
     if (response !== ui.Button.YES) return;
 
-    ui.alert('⏳ Processing...', 'Reading sheet data and submitting desktop jobs. Please wait.', ui.ButtonSet.OK);
+    ui.alert('⏳ Processing...', 'Reading Analysis sheet data and submitting jobs. Please wait.', ui.ButtonSet.OK);
 
     // Phase 1: Get sheet data and run preflight
     const sheetData = getSheetData();
@@ -131,12 +131,12 @@ function submitRankingJobs() {
     const jobCount = Object.values(taskResults).flat().length;
     ui.alert(
       '✅ Jobs Submitted Successfully!',
-      `${jobCount} desktop ranking jobs submitted to DataForSEO.\\n\\nWait 2-5 minutes, then click "Get Results".`,
+      `${jobCount} Analysis ranking jobs submitted to DataForSEO.\\n\\nWait 2-5 minutes, then click "Get Results".`,
       ui.ButtonSet.OK
     );
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error', `Failed to submit desktop jobs: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to submit Analysis jobs: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
     console.error('Submit jobs error:', error);
   }
 }
@@ -151,14 +151,14 @@ function getRankingResults() {
 
     // Show confirmation dialog
     const response = ui.alert(
-      'Get Ranking Results - Desktop',
-      'This will fetch results from DataForSEO and update the sheet with desktop rankings. Continue?',
+      'Get Ranking Results - Analysis',
+      'This will fetch results from DataForSEO and update the Analysis sheet. Continue?',
       ui.ButtonSet.YES_NO
     );
 
     if (response !== ui.Button.YES) return;
 
-    ui.alert('⏳ Processing...', 'Fetching desktop results from DataForSEO. This may take a moment.', ui.ButtonSet.OK);
+    ui.alert('⏳ Processing...', 'Fetching results from DataForSEO. This may take a moment.', ui.ButtonSet.OK);
 
     // Phase 1: Read task IDs from temporary storage
     const taskIds = getStoredTaskIds();
@@ -180,12 +180,12 @@ function getRankingResults() {
     // Show success message
     ui.alert(
       '✅ Results Updated Successfully!',
-      `Desktop ranking data has been updated in the sheet.\\n\\nCheck the latest columns for new rankings.`,
+      `Analysis ranking data has been updated in the sheet.\\n\\nCheck the latest column for new rankings.`,
       ui.ButtonSet.OK
     );
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error', `Failed to get desktop results: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to get Analysis results: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
     console.error('Get results error:', error);
   }
 }
@@ -200,7 +200,7 @@ function getRankingResults() {
  */
 function dailyRankingCheck() {
   try {
-    console.log('🤖 Starting automated desktop daily ranking check...');
+    console.log('🤖 Starting automated San Antonio Desktop daily ranking check...');
 
     // Phase 1: Submit ranking jobs
     submitRankingJobsAutomated();
@@ -212,10 +212,10 @@ function dailyRankingCheck() {
     // Phase 3: Get results
     getRankingResultsAutomated();
 
-    console.log('✅ Automated desktop daily ranking check completed successfully!');
+    console.log('✅ Automated San Antonio Desktop daily ranking check completed successfully!');
 
   } catch (error) {
-    console.error('❌ Automated desktop daily ranking check failed:', error);
+    console.error('❌ Automated San Antonio Desktop daily ranking check failed:', error);
 
     // Optional: Send email notification about the failure
     // You can uncomment and customize this if you want email alerts
@@ -223,8 +223,8 @@ function dailyRankingCheck() {
     try {
       MailApp.sendEmail({
         to: 'your-email@example.com',
-        subject: '❌ Desktop Daily Ranking Check Failed',
-        body: `The automated desktop daily ranking check failed with error: ${error.message}\n\nPlease check the Google Apps Script logs for more details.`
+        subject: '❌ San Antonio Desktop Daily Ranking Check Failed',
+        body: `The automated San Antonio Desktop daily ranking check failed with error: ${error.message}\n\nPlease check the Google Apps Script logs for more details.`
       });
     } catch (emailError) {
       console.error('Failed to send error notification email:', emailError);
@@ -238,7 +238,7 @@ function dailyRankingCheck() {
  * Used by daily automation - same logic as manual version but without user prompts
  */
 function submitRankingJobsAutomated() {
-  console.log('📤 Starting automated desktop job submission...');
+  console.log('📤 Starting automated San Antonio Desktop job submission...');
 
   // Phase 1: Get sheet data and run preflight
   const sheetData = getSheetData();
@@ -252,7 +252,7 @@ function submitRankingJobsAutomated() {
 
   // Log success
   const jobCount = Object.values(taskResults).flat().length;
-  console.log(`✅ Automated desktop job submission completed: ${jobCount} jobs submitted`);
+  console.log(`✅ Automated San Antonio Desktop job submission completed: ${jobCount} jobs submitted`);
 
   return jobCount;
 }
@@ -262,13 +262,13 @@ function submitRankingJobsAutomated() {
  * Used by daily automation - same logic as manual version but without user prompts
  */
 function getRankingResultsAutomated() {
-  console.log('📥 Starting automated desktop results retrieval...');
+  console.log('📥 Starting automated San Antonio Desktop results retrieval...');
 
   // Phase 1: Read task IDs from temporary storage
   const taskIds = getStoredTaskIds();
 
   if (taskIds.length === 0) {
-    console.log('⚠️ No task IDs found for automated desktop results retrieval');
+    console.log('⚠️ No task IDs found for automated San Antonio Desktop results retrieval');
     return;
   }
 
@@ -281,7 +281,7 @@ function getRankingResultsAutomated() {
   // Clear stored task IDs after successful retrieval
   clearStoredTaskIds();
 
-  console.log('✅ Automated desktop results retrieval completed successfully!');
+  console.log('✅ Automated San Antonio Desktop results retrieval completed successfully!');
 
   return results.length;
 }
@@ -291,7 +291,7 @@ function getRankingResultsAutomated() {
 // =============================================================================
 
 /**
- * Gets all data from the rankmonitor sheet
+ * Gets all data from the Analysis sheet
  */
 function getSheetData() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAMES.RANK_MONITOR);
@@ -299,14 +299,14 @@ function getSheetData() {
 }
 
 /**
- * Gets the rankmonitor sheet
+ * Gets the Analysis sheet
  */
 function getRankMonitorSheet() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAMES.RANK_MONITOR);
 }
 
 /**
- * Gets or creates the submit requests sheet for Desktop
+ * Gets or creates the submit requests sheet for Analysis
  */
 function getSubmitRequestsSheet() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -323,20 +323,20 @@ function getSubmitRequestsSheet() {
     // Format headers
     const headerRange = sheet.getRange(1, 1, 1, headers.length);
     headerRange.setFontWeight('bold');
-    headerRange.setBackground('#e3f2fd'); // Light blue for desktop theme
+    headerRange.setBackground('#e8f5e8'); // Light green for analysis theme
 
     // Set column widths
     sheet.setColumnWidth(1, 300); // Prime URL
     sheet.setColumnWidth(2, 500); // Request Data
 
-    console.log('✅ Created desktop_submit_requests sheet');
+    console.log(`✅ Created ${SHEET_NAMES.SUBMIT_REQUESTS} sheet`);
   }
 
   return sheet;
 }
 
 /**
- * Gets or creates the results dump sheet for Desktop
+ * Gets or creates the results dump sheet for Analysis
  */
 function getResultsDumpSheet() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -353,13 +353,13 @@ function getResultsDumpSheet() {
     // Format headers
     const headerRange = sheet.getRange(1, 1, 1, headers.length);
     headerRange.setFontWeight('bold');
-    headerRange.setBackground('#f1f8e9'); // Light green for desktop theme
+    headerRange.setBackground('#fff8dc'); // Beige theme complement
 
     // Set column widths
     sheet.setColumnWidth(1, 300); // Prime URL
     sheet.setColumnWidth(2, 600); // Raw DataForSEO Response
 
-    console.log('✅ Created desktop_results_dump sheet');
+    console.log(`✅ Created ${SHEET_NAMES.RESULTS_DUMP} sheet`);
   }
 
   return sheet;
@@ -380,10 +380,10 @@ function logSubmitRequest(primeUrl, requestData) {
     ];
 
     sheet.appendRow(rowData);
-    console.log(`📤 Desktop submit request logged for: ${primeUrl}`);
+    console.log(`📤 San Antonio Desktop submit request logged for: ${primeUrl}`);
 
   } catch (error) {
-    console.error('Failed to log desktop submit request:', error);
+    console.error('Failed to log San Antonio Desktop submit request:', error);
   }
 }
 
@@ -402,16 +402,16 @@ function logResultsDump(primeUrl, rawResponse) {
     ];
 
     sheet.appendRow(rowData);
-    console.log(`📥 Desktop results dump logged for: ${primeUrl}`);
+    console.log(`📥 San Antonio Desktop results dump logged for: ${primeUrl}`);
 
   } catch (error) {
-    console.error('Failed to log desktop results dump:', error);
+    console.error('Failed to log San Antonio Desktop results dump:', error);
   }
 }
 
 /**
  * Converts Google Sheets data to preflight structure
- * (Adapted from buildPreflight.js)
+ * (Adapted from buildPreflight.js for San Antonio Desktop)
  */
 function buildPreflightFromSheet(sheetData) {
   const output = {};
@@ -436,7 +436,7 @@ function buildPreflightFromSheet(sheetData) {
     // Create geo coordinate string
     const geo_coordinate = `${lat},${long}`;
 
-    // Generate intended URL
+    // Generate intended URL (adjust domain for San Antonio if different)
     const intended_url = `https://${office.toLowerCase()}.aaacwildliferemoval.com/service-area/${target.toLowerCase().replace(/\s+/g, '-')}/`;
     
     // Use provided primeUrl or generate one if empty
@@ -504,7 +504,7 @@ function submitJobsToDataForSEO(preflightData) {
           const taskId = responseData.tasks[0].id;
 
           // Log successful response to audit
-          console.log(`✅ Desktop job submitted successfully for ${prime_url}: ${taskId}`);
+          console.log(`✅ San Antonio Desktop job submitted successfully for ${prime_url}: ${taskId}`);
 
           results[office].push({
             ...item,
@@ -514,10 +514,10 @@ function submitJobsToDataForSEO(preflightData) {
           });
 
         } catch (error) {
-          console.error(`Error submitting desktop job for keyword "${keyword}":`, error);
+          console.error(`Error submitting San Antonio Desktop job for keyword "${keyword}":`, error);
 
           // Log error to audit
-          console.error(`❌ Failed to submit desktop job for ${prime_url}: ${error.message}`);
+          console.error(`❌ Failed to submit San Antonio Desktop job for ${prime_url}: ${error.message}`);
 
           results[office].push({
             ...item,
@@ -586,7 +586,7 @@ function fetchResultsFromDataForSEO(taskIds) {
   for (const task of taskIds) {
     try {
       // Log request to audit
-      console.log(`📥 Fetching desktop results for ${task.prime_url}: ${task.taskId}`);
+      console.log(`📥 Fetching San Antonio Desktop results for ${task.prime_url}: ${task.taskId}`);
 
       // Fetch results for this task
       const response = UrlFetchApp.fetch(
@@ -619,7 +619,7 @@ function fetchResultsFromDataForSEO(taskIds) {
         // Log raw DataForSEO response to results_dump tab
         logResultsDump(task.prime_url, taskResult);
 
-        console.log(`✅ Desktop results fetched for ${task.prime_url}: Found ${rawSerpItems.length} items, Prime URL rank: ${rankings.length > 0 ? rankings[0].rank : 'Not found'}`);
+        console.log(`✅ San Antonio Desktop results fetched for ${task.prime_url}: Found ${rawSerpItems.length} items, Prime URL rank: ${rankings.length > 0 ? rankings[0].rank : 'Not found'}`);
 
         results.push({
           ...task,
@@ -628,7 +628,7 @@ function fetchResultsFromDataForSEO(taskIds) {
         });
       } else {
         // Log no results to audit
-        console.log(`⚠️ No desktop results found for ${task.prime_url}: ${task.taskId}`);
+        console.log(`⚠️ No San Antonio Desktop results found for ${task.prime_url}: ${task.taskId}`);
 
         results.push({
           ...task,
@@ -638,10 +638,10 @@ function fetchResultsFromDataForSEO(taskIds) {
       }
 
     } catch (error) {
-      console.error(`Error fetching desktop results for task ${task.taskId}:`, error);
+      console.error(`Error fetching San Antonio Desktop results for task ${task.taskId}:`, error);
 
       // Log error to audit
-      console.error(`❌ Failed to fetch desktop results for ${task.prime_url}: ${error.message}`);
+      console.error(`❌ Failed to fetch San Antonio Desktop results for ${task.prime_url}: ${error.message}`);
 
       results.push({
         ...task,
@@ -695,7 +695,7 @@ function extractRankingData(serpResults, primeUrl) {
 }
 
 /**
- * Writes results back to the rankmonitor sheet
+ * Writes results back to the San Antonio Desktop sheet
  */
 function writeResultsToSheet(results) {
   const sheet = getRankMonitorSheet();
@@ -740,13 +740,13 @@ function checkJobStatus() {
   const taskIds = getStoredTaskIds();
 
   if (taskIds.length === 0) {
-    SpreadsheetApp.getUi().alert('No Jobs Found', 'No active desktop jobs to check.', SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert('No Jobs Found', 'No active San Antonio Desktop jobs to check.', SpreadsheetApp.getUi().ButtonSet.OK);
     return;
   }
 
   SpreadsheetApp.getUi().alert(
     'Job Status',
-    `Found ${taskIds.length} active desktop jobs.\\n\\nIf you submitted jobs 2-5 minutes ago, they should be ready.\\n\\nClick "Get Results" to fetch them.`,
+    `Found ${taskIds.length} active San Antonio Desktop jobs.\\n\\nIf you submitted jobs 2-5 minutes ago, they should be ready.\\n\\nClick "Get Results" to fetch them.`,
     SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
@@ -761,12 +761,12 @@ function viewSubmitRequests() {
 
     SpreadsheetApp.getUi().alert(
       '📤 Submit Requests Log',
-      `Desktop submit requests log opened! This sheet shows all requests sent to DataForSEO.\\n\\nColumns:\\n- Prime URL: The specific URL being tracked\\n- Request Data: The complete request payload`,
+      `San Antonio Desktop submit requests log opened! This sheet shows all requests sent to DataForSEO.\\n\\nColumns:\\n- Prime URL: The specific URL being tracked\\n- Request Data: The complete request payload`,
       SpreadsheetApp.getUi().ButtonSet.OK
     );
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error', `Failed to open desktop submit requests: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to open San Antonio Desktop submit requests: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
@@ -780,22 +780,22 @@ function viewResultsDump() {
 
     SpreadsheetApp.getUi().alert(
       '📥 Results Dump',
-      `Desktop results dump opened! This sheet shows all raw responses from DataForSEO.\\n\\nColumns:\\n- Prime URL: The specific URL being tracked\\n- Raw DataForSEO Response: Complete response including all SERP data`,
+      `San Antonio Desktop results dump opened! This sheet shows all raw responses from DataForSEO.\\n\\nColumns:\\n- Prime URL: The specific URL being tracked\\n- Raw DataForSEO Response: Complete response including all SERP data`,
       SpreadsheetApp.getUi().ButtonSet.OK
     );
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error', `Failed to open desktop results dump: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to open San Antonio Desktop results dump: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
 /**
- * Clears task data from rankmonitor sheet and temporary storage
+ * Clears task data from San Antonio Desktop sheet and temporary storage
  */
 function clearTaskData() {
   const response = SpreadsheetApp.getUi().alert(
     'Clear Task Data',
-    'This will clear all desktop ranking data from the rankmonitor sheet and stored task IDs. Continue?',
+    'This will clear all ranking data from the San Antonio Desktop sheet and stored task IDs. Continue?',
     SpreadsheetApp.getUi().ButtonSet.YES_NO
   );
 
@@ -804,9 +804,9 @@ function clearTaskData() {
   const sheet = getRankMonitorSheet();
   const lastRow = sheet.getLastRow();
 
-  // Clear all desktop ranking data columns (starting from column J)
-  const startCol = BASE_COLUMNS.FIRST_DATA_COL + 1; // +1 for 1-based indexing
-  const numCols = sheet.getLastColumn() - BASE_COLUMNS.FIRST_DATA_COL;
+  // Clear all ranking data columns (starting from column I)
+  const startCol = BASE_COLUMNS.PRIME_URL + 1; // +1 for 1-based indexing
+  const numCols = sheet.getLastColumn() - BASE_COLUMNS.PRIME_URL;
   if (numCols > 0) {
     sheet.getRange(1, startCol, lastRow, numCols).clearContent(); // Clear headers too
   }
@@ -814,7 +814,7 @@ function clearTaskData() {
   // Clear stored task IDs
   clearStoredTaskIds();
 
-  SpreadsheetApp.getUi().alert('✅ Cleared', 'Desktop task data and stored task IDs have been cleared.', SpreadsheetApp.getUi().ButtonSet.OK);
+  SpreadsheetApp.getUi().alert('✅ Cleared', 'San Antonio Desktop task data and stored task IDs have been cleared.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /**
@@ -830,7 +830,7 @@ function testDataForSEOConnection() {
     });
 
     if (response.getResponseCode() === 200) {
-      SpreadsheetApp.getUi().alert('✅ Connection Successful', 'DataForSEO API connection is working for Desktop!', SpreadsheetApp.getUi().ButtonSet.OK);
+      SpreadsheetApp.getUi().alert('✅ Connection Successful', 'DataForSEO API connection is working for San Antonio Desktop!', SpreadsheetApp.getUi().ButtonSet.OK);
     } else {
       SpreadsheetApp.getUi().alert('❌ Connection Failed', `API returned status: ${response.getResponseCode()}`, SpreadsheetApp.getUi().ButtonSet.OK);
     }
@@ -867,12 +867,12 @@ function storeTaskIds(taskResults) {
     }
   }
 
-  // Store in Script Properties with timestamp (use unique key for Desktop)
+  // Store in Script Properties with timestamp (use unique key for San Antonio Desktop)
   const timestamp = new Date().getTime();
-  PropertiesService.getScriptProperties().setProperty('desktopTaskIds', JSON.stringify(taskData));
-  PropertiesService.getScriptProperties().setProperty('desktopTaskIds_timestamp', timestamp.toString());
+  PropertiesService.getScriptProperties().setProperty('sanAntonioDesktopTaskIds', JSON.stringify(taskData));
+  PropertiesService.getScriptProperties().setProperty('sanAntonioDesktopTaskIds_timestamp', timestamp.toString());
 
-  console.log(`Stored ${taskData.length} desktop task IDs temporarily`);
+  console.log(`Stored ${taskData.length} San Antonio Desktop task IDs temporarily`);
 }
 
 /**
@@ -880,11 +880,11 @@ function storeTaskIds(taskResults) {
  */
 function getStoredTaskIds() {
   try {
-    const taskData = PropertiesService.getScriptProperties().getProperty('desktopTaskIds');
-    const timestamp = PropertiesService.getScriptProperties().getProperty('desktopTaskIds_timestamp');
+    const taskData = PropertiesService.getScriptProperties().getProperty('sanAntonioDesktopTaskIds');
+    const timestamp = PropertiesService.getScriptProperties().getProperty('sanAntonioDesktopTaskIds_timestamp');
 
     if (!taskData) {
-      console.log('No stored desktop task IDs found');
+      console.log('No stored San Antonio Desktop task IDs found');
       return [];
     }
 
@@ -894,17 +894,17 @@ function getStoredTaskIds() {
     const maxAge = 30 * 60 * 1000; // 30 minutes
 
     if (currentTime - storedTime > maxAge) {
-      console.log('Stored desktop task IDs are too old, clearing them');
+      console.log('Stored San Antonio Desktop task IDs are too old, clearing them');
       clearStoredTaskIds();
       return [];
     }
 
     const parsed = JSON.parse(taskData);
-    console.log(`Retrieved ${parsed.length} stored desktop task IDs`);
+    console.log(`Retrieved ${parsed.length} stored San Antonio Desktop task IDs`);
     return parsed;
 
   } catch (error) {
-    console.error('Error retrieving stored desktop task IDs:', error);
+    console.error('Error retrieving stored San Antonio Desktop task IDs:', error);
     return [];
   }
 }
@@ -913,9 +913,9 @@ function getStoredTaskIds() {
  * Clears stored task IDs from Script Properties
  */
 function clearStoredTaskIds() {
-  PropertiesService.getScriptProperties().deleteProperty('desktopTaskIds');
-  PropertiesService.getScriptProperties().deleteProperty('desktopTaskIds_timestamp');
-  console.log('Cleared stored desktop task IDs');
+  PropertiesService.getScriptProperties().deleteProperty('sanAntonioDesktopTaskIds');
+  PropertiesService.getScriptProperties().deleteProperty('sanAntonioDesktopTaskIds_timestamp');
+  console.log('Cleared stored San Antonio Desktop task IDs');
 }
 
 // =============================================================================
@@ -931,8 +931,8 @@ function setupDailyAutomation() {
 
     // Show information about automation
     const setupResponse = ui.alert(
-      '🤖 Setup Desktop Daily Automation',
-      'This will create a daily trigger to automatically check desktop rankings.\\n\\nAfter clicking OK, you will be shown instructions to set up the time trigger manually in the Apps Script interface.',
+      '🤖 Setup San Antonio Desktop Daily Automation',
+      'This will create a daily trigger to automatically check San Antonio Desktop rankings.\\n\\nAfter clicking OK, you will be shown instructions to set up the time trigger manually in the Apps Script interface.',
       ui.ButtonSet.OK_CANCEL
     );
 
@@ -947,7 +947,7 @@ function setupDailyAutomation() {
     if (dailyTrigger) {
       ui.alert(
         '⚠️ Automation Already Active',
-        'Desktop daily automation is already set up!\\n\\nIf you want to change the time, first click "Disable Automation", then set it up again.',
+        'San Antonio Desktop daily automation is already set up!\\n\\nIf you want to change the time, first click "Disable Automation", then set it up again.',
         ui.ButtonSet.OK
       );
       return;
@@ -956,16 +956,16 @@ function setupDailyAutomation() {
     // Show setup instructions
     ui.alert(
       '📋 Setup Instructions',
-      'To complete the desktop setup:\\n\\n1. Go to Apps Script (script.google.com)\\n2. Open your project\\n3. Click "Triggers" (clock icon on left)\\n4. Click "+ Add Trigger"\\n5. Choose:\\n   - Function: dailyRankingCheck\\n   - Event source: Time-driven\\n   - Type: Day timer\\n   - Time: Pick your preferred time\\n6. Click "Save"\\n\\nRecommended time: 9:00 AM (after business hours start)',
+      'To complete the San Antonio Desktop setup:\\n\\n1. Go to Apps Script (script.google.com)\\n2. Open your project\\n3. Click "Triggers" (clock icon on left)\\n4. Click "+ Add Trigger"\\n5. Choose:\\n   - Function: dailyRankingCheck\\n   - Event source: Time-driven\\n   - Type: Day timer\\n   - Time: Pick your preferred time\\n6. Click "Save"\\n\\nRecommended time: 9:00 AM (after business hours start)',
       ui.ButtonSet.OK
     );
 
     // Store automation preference
-    PropertiesService.getScriptProperties().setProperty('desktopAutomation_enabled', 'true');
+    PropertiesService.getScriptProperties().setProperty('sanAntonioDesktopAutomation_enabled', 'true');
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error', `Failed to setup desktop automation: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
-    console.error('Setup desktop automation error:', error);
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to setup San Antonio Desktop automation: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    console.error('Setup San Antonio Desktop automation error:', error);
   }
 }
 
@@ -977,8 +977,8 @@ function disableAutomation() {
     const ui = SpreadsheetApp.getUi();
 
     const response = ui.alert(
-      '🔕 Disable Desktop Automation',
-      'This will remove the desktop daily automation trigger. You can still run rankings manually.\\n\\nContinue?',
+      '🔕 Disable San Antonio Desktop Automation',
+      'This will remove the San Antonio Desktop daily automation trigger. You can still run rankings manually.\\n\\nContinue?',
       ui.ButtonSet.YES_NO
     );
 
@@ -996,25 +996,25 @@ function disableAutomation() {
     }
 
     // Remove automation preference
-    PropertiesService.getScriptProperties().deleteProperty('desktopAutomation_enabled');
+    PropertiesService.getScriptProperties().deleteProperty('sanAntonioDesktopAutomation_enabled');
 
     if (removedCount > 0) {
       ui.alert(
         '✅ Automation Disabled',
-        `Removed ${removedCount} desktop automation trigger(s).\\n\\nDaily automation is now disabled. You can still run rankings manually using the menu.`,
+        `Removed ${removedCount} San Antonio Desktop automation trigger(s).\\n\\nDaily automation is now disabled. You can still run rankings manually using the menu.`,
         ui.ButtonSet.OK
       );
     } else {
       ui.alert(
         'ℹ️ No Automation Found',
-        'No active desktop automation triggers were found to remove.',
+        'No active San Antonio Desktop automation triggers were found to remove.',
         ui.ButtonSet.OK
       );
     }
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error', `Failed to disable desktop automation: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
-    console.error('Disable desktop automation error:', error);
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to disable San Antonio Desktop automation: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    console.error('Disable San Antonio Desktop automation error:', error);
   }
 }
 
@@ -1026,26 +1026,26 @@ function testDailyRankingCheck() {
     const ui = SpreadsheetApp.getUi();
 
     const response = ui.alert(
-      '🧪 Test Desktop Daily Check',
-      'This will run the complete automated desktop daily ranking check process.\\n\\nThis includes:\\n- Submit jobs\\n- Wait 5 minutes\\n- Get results\\n\\nThis may take 6-7 minutes total. Continue?',
+      '🧪 Test San Antonio Desktop Daily Check',
+      'This will run the complete automated San Antonio Desktop daily ranking check process.\\n\\nThis includes:\\n- Submit jobs\\n- Wait 5 minutes\\n- Get results\\n\\nThis may take 6-7 minutes total. Continue?',
       ui.ButtonSet.YES_NO
     );
 
     if (response !== ui.Button.YES) return;
 
-    ui.alert('⏳ Starting Test...', 'Running automated desktop daily check. This will take about 6-7 minutes.\\n\\nYou can monitor progress in the Apps Script logs.', ui.ButtonSet.OK);
+    ui.alert('⏳ Starting Test...', 'Running automated San Antonio Desktop daily check. This will take about 6-7 minutes.\\n\\nYou can monitor progress in the Apps Script logs.', ui.ButtonSet.OK);
 
     // Run the daily check
     dailyRankingCheck();
 
     ui.alert(
       '✅ Test Completed!',
-      'Desktop daily ranking check test completed successfully!\\n\\nCheck your sheet for updated rankings.',
+      'San Antonio Desktop daily ranking check test completed successfully!\\n\\nCheck your sheet for updated rankings.',
       ui.ButtonSet.OK
     );
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Test Failed', `Desktop daily check test failed: ${error.message}\\n\\nCheck the Apps Script logs for more details.`, SpreadsheetApp.getUi().ButtonSet.OK);
-    console.error('Test desktop daily check error:', error);
+    SpreadsheetApp.getUi().alert('❌ Test Failed', `San Antonio Desktop daily check test failed: ${error.message}\\n\\nCheck the Apps Script logs for more details.`, SpreadsheetApp.getUi().ButtonSet.OK);
+    console.error('Test San Antonio Desktop daily check error:', error);
   }
 }
