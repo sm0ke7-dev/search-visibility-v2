@@ -1,5 +1,5 @@
 /**
- * Google Apps Script for Search Visibility Ranking Tracker - San Antonio Office (Desktop)
+ * Google Apps Script for Search Visibility Ranking Tracker - Active Tab
  *
  * Instructions:
  * 1. Open Google Apps Script (script.google.com)
@@ -40,31 +40,30 @@ const SHEET_NAMES = {
 };
 
 /**
- * Base column configuration for analysis tab
- * Updated to match actual spreadsheet structure from image
+ * Base column configuration - Updated to match image structure
  */
 const BASE_COLUMNS = {
-  OFFICE: 0,       // Column A
-  TARGETS: 1,      // Column B
-  SERVICE: 2,      // Column C
-  LAT: 3,          // Column D
-  LONG: 4,         // Column E
-  RANK: 5,         // Column F (existing rank data)
-  RANKING_URL: 6,  // Column G (existing ranking URL data)
-  PROXIMITY: 7,    // Column H (proximity from centerpoint)
-  PRIME_URL: 8,    // Column I (prime URL - needs to be added)
-  FIRST_DATA_COL: 9 // Column J - where new data columns start
+  OFFICE: 0,       // Column A - Office
+  STATE: 1,        // Column B - State
+  TARGETS: 2,      // Column C - Targets (City)
+  SERVICE: 3,      // Column D - Service
+  LAT: 4,          // Column E - Latitude
+  LONG: 5,         // Column F - Longitude
+  PRIME_URL: 6,    // Column G - Prime URL
+  POPULATION: 7,   // Column H - Population
+  INCOME: 8,       // Column I - Income
+  FIRST_DATA_COL: 9 // Column J - where new ranking data columns start
 };
 
 /**
  * Returns the fixed columns for ranking data (always overwrites same columns)
- * Returns the column indices for Rank and URL
+ * Returns the column indices for Rank and URL - ALWAYS J and K
  */
 function findNextEmptyColumns() {
-  // Write to columns I and J (after existing data)
+  // Always write to columns J and K (overwrite existing data)
   return {
-    RANK: BASE_COLUMNS.PRIME_URL,     // Column I (prime URL column)
-    URL: BASE_COLUMNS.FIRST_DATA_COL  // Column J (after existing data)
+    RANK: BASE_COLUMNS.FIRST_DATA_COL,     // Column J (always)
+    URL: BASE_COLUMNS.FIRST_DATA_COL + 1   // Column K (always)
   };
 }
 
@@ -77,21 +76,180 @@ function findNextEmptyColumns() {
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('📊 Analysis Ranking Tracker')  // Analysis themed menu
-    .addItem('📤 Submit Ranking Jobs', 'submitRankingJobs')
-    .addItem('📥 Get Results', 'getRankingResults')
-    .addSeparator()
-    .addItem('📊 View Job Status', 'checkJobStatus')
-    .addItem('📋 View Submit Requests', 'viewSubmitRequests')
-    .addItem('📋 View Results Dump', 'viewResultsDump')
-    .addItem('🧹 Clear Task Data', 'clearTaskData')
-    .addSeparator()
-    .addItem('🤖 Setup Daily Automation', 'setupDailyAutomation')
-    .addItem('🔕 Disable Automation', 'disableAutomation')
-    .addItem('🧪 Test Daily Check', 'testDailyRankingCheck')
-    .addSeparator()
-    .addItem('⚙️ Test Connection', 'testDataForSEOConnection')
+  ui.createMenu('📊 Enhanced Ranking Tracker')
+    .addSubMenu(ui.createMenu('📍 Geocoding & Census')
+      .addItem('🌍 Geocode Cities & Get Census Data', 'runGeocodeAndPopulation')
+      .addItem('🔄 Update Coordinates Only', 'updateCoordinatesOnly'))
+    .addSubMenu(ui.createMenu('📤 Ranking Jobs')
+      .addItem('📤 Submit Ranking Jobs', 'submitRankingJobs')
+      .addItem('📥 Get Results', 'getRankingResults'))
+    .addSubMenu(ui.createMenu('📊 Analysis')
+      .addItem('📊 View Job Status', 'checkJobStatus')
+      .addItem('📋 View Submit Requests', 'viewSubmitRequests')
+      .addItem('📋 View Results Dump', 'viewResultsDump'))
+    .addSubMenu(ui.createMenu('🧹 Maintenance')
+      .addItem('🧹 Clear Task Data', 'clearTaskData')
+      .addItem('⚙️ Test Connection', 'testDataForSEOConnection'))
+    .addSubMenu(ui.createMenu('🤖 Automation')
+      .addItem('🤖 Setup Daily Automation', 'setupDailyAutomation')
+      .addItem('🔕 Disable Automation', 'disableAutomation')
+      .addItem('🧪 Test Daily Check', 'testDailyRankingCheck'))
     .addToUi();
+}
+
+// =============================================================================
+// GEOCODING & CENSUS FUNCTIONS
+// =============================================================================
+
+/**
+ * Main geocoding function - Geocodes cities and fetches census data
+ */
+function runGeocodeAndPopulation() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    SpreadsheetApp.getUi().alert('No data rows found. Please add Office (A), State (B), Targets (C), and Service (D).');
+    return;
+  }
+
+  Logger.log('[RUN] Starting runGeocodeAndPopulation on sheet "%s" rows 2..%s', sheet.getName(), lastRow);
+
+  const dataRange = sheet.getRange(2, 1, lastRow - 1, 4); // A2:D
+  const dataValues = dataRange.getValues();
+  Logger.log('[RUN] Loaded %s rows of data', dataValues.length);
+
+  const output = [];
+  let processed = 0;
+  let successes = 0;
+  let failures = 0;
+
+  for (let i = 0; i < dataValues.length; i++) {
+    const row = dataValues[i];
+    const office = String(row[0] || '').trim();
+    const state = String(row[1] || '').trim();
+    const city = String(row[2] || '').trim();
+    const service = String(row[3] || '').trim();
+    processed++;
+
+    if (!city && !state) {
+      Logger.log('[ROW %s] Empty city/state; skipping.', i + 2);
+      output.push(['', '', '', '', '']); // lat, long, prime_url, population, income
+      continue;
+    }
+
+    Logger.log('[ROW %s] Input office="%s" state="%s" city="%s" service="%s"', i + 2, office, state, city, service);
+
+    try {
+      const geocode = geocodeCityState(city, state);
+      if (!geocode) {
+        Logger.log('[ROW %s] Geocode returned no result', i + 2);
+        failures++;
+        output.push(['', '', '', '', '']);
+        continue;
+      }
+
+      const { latitude, longitude, stateFips, placeCode } = geocode;
+      Logger.log('[ROW %s] Geocode raw lat=%s lng=%s stateFips=%s place=%s', i + 2, latitude, longitude, stateFips, placeCode);
+
+      // Generate prime URL
+      const primeUrl = `https://${office.toLowerCase()}.aaacwildliferemoval.com/service-area/${city.toLowerCase().replace(/\s+/g, '-')}/`;
+
+      let population = '';
+      let income = '';
+      
+      if (stateFips && placeCode) {
+        const acsData = fetchPopulationAcs(stateFips, placeCode);
+        if (acsData && typeof acsData === 'object') {
+          population = acsData.population || '';
+          income = acsData.income || '';
+        } else {
+          population = acsData || '';
+        }
+        Logger.log('[ROW %s] Population=%s Income=%s', i + 2, population, income);
+      } else {
+        Logger.log('[ROW %s] Missing stateFips/placeCode; skipping ACS lookup', i + 2);
+        population = '❌ NO PLACE CODE';
+        income = '❌ NO PLACE CODE';
+      }
+
+      Logger.log('[ROW %s] Writing lat=%s lng=%s', i + 2, latitude, longitude);
+
+      output.push([latitude, longitude, primeUrl, population, income]);
+      successes++;
+
+      Utilities.sleep(120);
+    } catch (err) {
+      Logger.log('[ROW %s] ERROR: %s', i + 2, err && err.message ? err.message : String(err));
+      output.push(['', '', '', '', '']);
+      failures++;
+    }
+  }
+
+  if (output.length > 0) {
+    sheet.getRange(2, 5, output.length, 5).setValues(output); // Write to columns E, F, G, H, I
+  }
+
+  const summary = `Done. Processed ${processed}. Success ${successes}. Fail ${failures}.`;
+  Logger.log('[RUN] %s', summary);
+  SpreadsheetApp.getActive().toast(summary, 'Geocoding & Census', 5);
+}
+
+/**
+ * Update coordinates only (without census data)
+ */
+function updateCoordinatesOnly() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    SpreadsheetApp.getUi().alert('No data rows found. Please add Office (A), State (B), Targets (C), and Service (D).');
+    return;
+  }
+
+  const dataRange = sheet.getRange(2, 1, lastRow - 1, 4); // A2:D
+  const dataValues = dataRange.getValues();
+  const output = [];
+  let processed = 0;
+  let successes = 0;
+  let failures = 0;
+
+  for (let i = 0; i < dataValues.length; i++) {
+    const row = dataValues[i];
+    const office = String(row[0] || '').trim();
+    const state = String(row[1] || '').trim();
+    const city = String(row[2] || '').trim();
+    const service = String(row[3] || '').trim();
+    processed++;
+
+    if (!city && !state) {
+      output.push(['', '']); // lat, long only
+      continue;
+    }
+
+    try {
+      const geocode = geocodeCityState(city, state);
+      if (!geocode) {
+        output.push(['', '']);
+        failures++;
+        continue;
+      }
+
+      const { latitude, longitude } = geocode;
+      output.push([latitude, longitude]);
+      successes++;
+
+      Utilities.sleep(120);
+    } catch (err) {
+      output.push(['', '']);
+      failures++;
+    }
+  }
+
+  if (output.length > 0) {
+    sheet.getRange(2, 5, output.length, 2).setValues(output); // Write to columns E, F only
+  }
+
+  const summary = `Coordinates updated. Processed ${processed}. Success ${successes}. Fail ${failures}.`;
+  SpreadsheetApp.getActive().toast(summary, 'Coordinates Update', 5);
 }
 
 // =============================================================================
@@ -115,7 +273,7 @@ function submitRankingJobs() {
 
     if (response !== ui.Button.YES) return;
 
-    ui.alert('⏳ Processing...', 'Reading Analysis sheet data and submitting jobs. Please wait.', ui.ButtonSet.OK);
+    ui.alert('⏳ Processing...', 'Reading active sheet data and submitting jobs. Please wait.', ui.ButtonSet.OK);
 
     // Phase 1: Get sheet data and run preflight
     const sheetData = getSheetData();
@@ -152,7 +310,7 @@ function getRankingResults() {
     // Show confirmation dialog
     const response = ui.alert(
       'Get Ranking Results - Analysis',
-      'This will fetch results from DataForSEO and update the Analysis sheet. Continue?',
+      'This will fetch results from DataForSEO and update the active sheet. Continue?',
       ui.ButtonSet.YES_NO
     );
 
@@ -180,7 +338,7 @@ function getRankingResults() {
     // Show success message
     ui.alert(
       '✅ Results Updated Successfully!',
-      `Analysis ranking data has been updated in the sheet.\\n\\nCheck the latest column for new rankings.`,
+      `Analysis ranking data has been updated in the active sheet.\\n\\nCheck the latest column for new rankings.`,
       ui.ButtonSet.OK
     );
 
@@ -200,7 +358,7 @@ function getRankingResults() {
  */
 function dailyRankingCheck() {
   try {
-    console.log('🤖 Starting automated San Antonio Desktop daily ranking check...');
+    console.log('🤖 Starting automated Analysis daily ranking check...');
 
     // Phase 1: Submit ranking jobs
     submitRankingJobsAutomated();
@@ -212,10 +370,10 @@ function dailyRankingCheck() {
     // Phase 3: Get results
     getRankingResultsAutomated();
 
-    console.log('✅ Automated San Antonio Desktop daily ranking check completed successfully!');
+    console.log('✅ Automated Analysis daily ranking check completed successfully!');
 
   } catch (error) {
-    console.error('❌ Automated San Antonio Desktop daily ranking check failed:', error);
+    console.error('❌ Automated Analysis daily ranking check failed:', error);
 
     // Optional: Send email notification about the failure
     // You can uncomment and customize this if you want email alerts
@@ -223,8 +381,8 @@ function dailyRankingCheck() {
     try {
       MailApp.sendEmail({
         to: 'your-email@example.com',
-        subject: '❌ San Antonio Desktop Daily Ranking Check Failed',
-        body: `The automated San Antonio Desktop daily ranking check failed with error: ${error.message}\n\nPlease check the Google Apps Script logs for more details.`
+        subject: '❌ Analysis Daily Ranking Check Failed',
+        body: `The automated Analysis daily ranking check failed with error: ${error.message}\n\nPlease check the Google Apps Script logs for more details.`
       });
     } catch (emailError) {
       console.error('Failed to send error notification email:', emailError);
@@ -238,7 +396,7 @@ function dailyRankingCheck() {
  * Used by daily automation - same logic as manual version but without user prompts
  */
 function submitRankingJobsAutomated() {
-  console.log('📤 Starting automated San Antonio Desktop job submission...');
+  console.log('📤 Starting automated Analysis job submission...');
 
   // Phase 1: Get sheet data and run preflight
   const sheetData = getSheetData();
@@ -252,7 +410,7 @@ function submitRankingJobsAutomated() {
 
   // Log success
   const jobCount = Object.values(taskResults).flat().length;
-  console.log(`✅ Automated San Antonio Desktop job submission completed: ${jobCount} jobs submitted`);
+  console.log(`✅ Automated Analysis job submission completed: ${jobCount} jobs submitted`);
 
   return jobCount;
 }
@@ -262,13 +420,13 @@ function submitRankingJobsAutomated() {
  * Used by daily automation - same logic as manual version but without user prompts
  */
 function getRankingResultsAutomated() {
-  console.log('📥 Starting automated San Antonio Desktop results retrieval...');
+  console.log('📥 Starting automated Analysis results retrieval...');
 
   // Phase 1: Read task IDs from temporary storage
   const taskIds = getStoredTaskIds();
 
   if (taskIds.length === 0) {
-    console.log('⚠️ No task IDs found for automated San Antonio Desktop results retrieval');
+    console.log('⚠️ No task IDs found for automated Analysis results retrieval');
     return;
   }
 
@@ -281,9 +439,224 @@ function getRankingResultsAutomated() {
   // Clear stored task IDs after successful retrieval
   clearStoredTaskIds();
 
-  console.log('✅ Automated San Antonio Desktop results retrieval completed successfully!');
+  console.log('✅ Automated Analysis results retrieval completed successfully!');
 
   return results.length;
+}
+
+// =============================================================================
+// GOOGLE GEOCODING & CENSUS API FUNCTIONS
+// =============================================================================
+
+/**
+ * Google Geocoding function
+ */
+function geocodeCityState(city, state) {
+  const address = `${city}, ${state}`;
+  const encodedAddress = encodeURIComponent(address);
+  
+  // Get Google API key from script properties
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GOOGLE_API_KEY');
+  if (!apiKey) {
+    Logger.log('[GOOGLE-GEOCODER] ERROR: GOOGLE_API_KEY not found in script properties');
+    return null;
+  }
+  
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
+  Logger.log('[GOOGLE-GEOCODER] URL: %s', url);
+  
+  try {
+    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+    const status = resp.getResponseCode();
+    Logger.log('[GOOGLE-GEOCODER] Status: %s', status);
+    
+    if (status !== 200) {
+      Logger.log('[GOOGLE-GEOCODER] Non-200 response. Body: %s', safeSnippet(resp.getContentText()));
+      return null;
+    }
+    
+    const text = resp.getContentText();
+    Logger.log('[GOOGLE-GEOCODER] Body snippet: %s', safeSnippet(text));
+    
+    const data = JSON.parse(text);
+    if (data.status !== 'OK') {
+      Logger.log('[GOOGLE-GEOCODER] API error: %s', data.status);
+      return null;
+    }
+    
+    const results = data.results || [];
+    if (!results.length) {
+      Logger.log('[GOOGLE-GEOCODER] No results for "%s"', address);
+      return null;
+    }
+    
+    const top = results[0];
+    const location = top.geometry?.location;
+    if (!location) {
+      Logger.log('[GOOGLE-GEOCODER] No location in result');
+      return null;
+    }
+    
+    const latitude = location.lat;
+    const longitude = location.lng;
+    
+    // Try to get state FIPS and place code from Google's result
+    let stateFips = '';
+    let placeCode = '';
+    
+    // Look for state FIPS in address components
+    const addressComponents = top.address_components || [];
+    for (let i = 0; i < addressComponents.length; i++) {
+      const component = addressComponents[i];
+      if (component.types.includes('administrative_area_level_1')) {
+        // Try to get state FIPS from the short_name or long_name
+        const stateName = component.short_name || component.long_name;
+        stateFips = getStateFipsFromAbbr(stateName);
+        break;
+      }
+    }
+    
+    // For place code, we'll need to use coordinates to get Census geography
+    if (stateFips && latitude && longitude) {
+      const geoByCoord = getGeographiesByCoordinates(longitude, latitude);
+      if (geoByCoord && geoByCoord.placeCode) {
+        placeCode = geoByCoord.placeCode;
+      }
+    }
+    
+    Logger.log('[GOOGLE-GEOCODER] Found lat=%s lng=%s stateFips=%s placeCode=%s', latitude, longitude, stateFips, placeCode);
+    return { latitude, longitude, stateFips, placeCode, googleTypes: top.types || [] };
+    
+  } catch (e) {
+    Logger.log('[GOOGLE-GEOCODER] ERROR: %s', e && e.message ? e.message : String(e));
+    return null;
+  }
+}
+
+/**
+ * Get Census geographies by coordinates
+ */
+function getGeographiesByCoordinates(lng, lat) {
+  const url = `https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=${encodeURIComponent(lng)}&y=${encodeURIComponent(lat)}&benchmark=Public_AR_Current&vintage=Current_Current&format=json`;
+  Logger.log('[GEO-BY-COORD] URL: %s', url);
+  try {
+    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+    const status = resp.getResponseCode();
+    Logger.log('[GEO-BY-COORD] Status: %s', status);
+    if (status !== 200) {
+      Logger.log('[GEO-BY-COORD] Non-200 response. Body: %s', safeSnippet(resp.getContentText()));
+      return null;
+    }
+    const text = resp.getContentText();
+    Logger.log('[GEO-BY-COORD] Body snippet: %s', safeSnippet(text));
+    const json = JSON.parse(text);
+    const result = (json || {}).result || {};
+    const geogs = result.geographies || {};
+    const placeCollections = Object.keys(geogs).filter(k => /Place/i.test(k));
+
+    let place = null;
+    for (let i = 0; i < placeCollections.length; i++) {
+      const items = geogs[placeCollections[i]];
+      if (Array.isArray(items) && items.length) {
+        place = items[0];
+        break;
+      }
+    }
+
+    if (!place) {
+      Logger.log('[GEO-BY-COORD] No Place geography found');
+      return { stateFips: '', placeCode: '' };
+    }
+
+    const stateFips = String(place.STATE || place.STATEFP || '').trim();
+    const placeCode = String(place.PLACE || place.PLACEFP || '').trim();
+    return { stateFips, placeCode };
+  } catch (e) {
+    Logger.log('[GEO-BY-COORD] ERROR: %s', e && e.message ? e.message : String(e));
+    return null;
+  }
+}
+
+/**
+ * Fetch population and income from Census ACS API
+ */
+function fetchPopulationAcs(stateFips, placeCode) {
+  // Use Census ACS API
+  const year = '2023';
+  const base = `https://api.census.gov/data/${year}/acs/acs5`;
+  const params = `get=NAME,B01003_001E,B19013_001E&for=place:${encodeURIComponent(placeCode)}&in=state:${encodeURIComponent(stateFips)}`;
+  const url = `${base}?${params}`;
+
+  Logger.log('[ACS] URL: %s', url);
+  try {
+    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+    const status = resp.getResponseCode();
+    Logger.log('[ACS] Status: %s', status);
+    
+    if (status === 200) {
+      const text = resp.getContentText();
+      Logger.log('[ACS] Body snippet: %s', safeSnippet(text));
+      
+      const json = JSON.parse(text);
+      if (!Array.isArray(json) || json.length < 2) {
+        Logger.log('[ACS] Unexpected JSON shape');
+        return { population: '', income: '' };
+      }
+      
+      const headers = json[0];
+      const rows = json.slice(1);
+      
+      const popIndex = headers.indexOf('B01003_001E');
+      const incomeIndex = headers.indexOf('B19013_001E');
+      
+      if (popIndex === -1 || incomeIndex === -1) {
+        Logger.log('[ACS] Missing required columns. Headers: %s', JSON.stringify(headers));
+        return { population: '', income: '' };
+      }
+      
+      const firstRow = rows[0];
+      const population = firstRow[popIndex] || '';
+      const income = firstRow[incomeIndex] || '';
+      
+      Logger.log('[ACS] Found population=%s income=%s', population, income);
+      return { population, income };
+    } else {
+      Logger.log('[ACS] Non-200 response. Body: %s', safeSnippet(resp.getContentText()));
+      return { population: '', income: '' };
+    }
+  } catch (e) {
+    Logger.log('[ACS] ERROR: %s', e && e.message ? e.message : String(e));
+    return { population: '', income: '' };
+  }
+}
+
+/**
+ * Get state FIPS code from abbreviation
+ */
+function getStateFipsFromAbbr(stateAbbr) {
+  const map = {
+    'AL': '01','AK': '02','AZ': '04','AR': '05','CA': '06','CO': '08','CT': '09','DE': '10','DC': '11',
+    'FL': '12','GA': '13','HI': '15','ID': '16','IL': '17','IN': '18','IA': '19','KS': '20','KY': '21',
+    'LA': '22','ME': '23','MD': '24','MA': '25','MI': '26','MN': '27','MS': '28','MO': '29','MT': '30',
+    'NE': '31','NV': '32','NH': '33','NJ': '34','NM': '35','NY': '36','NC': '37','ND': '38','OH': '39',
+    'OK': '40','OR': '41','PA': '42','RI': '44','SC': '45','SD': '46','TN': '47','TX': '48','UT': '49',
+    'VT': '50','VA': '51','WA': '53','WV': '54','WI': '55','WY': '56','PR': '72'
+  };
+  const key = String(stateAbbr || '').toUpperCase();
+  return map[key] || '';
+}
+
+/**
+ * Safe snippet function for logging
+ */
+function safeSnippet(text) {
+  try {
+    if (typeof text !== 'string') return '';
+    const trimmed = text.replace(/\s+/g, ' ').trim();
+    return trimmed.length > 400 ? trimmed.substring(0, 400) + '…' : trimmed;
+  } catch (e) {
+    return '';
+  }
 }
 
 // =============================================================================
@@ -291,18 +664,18 @@ function getRankingResultsAutomated() {
 // =============================================================================
 
 /**
- * Gets all data from the Analysis sheet
+ * Gets all data from the active sheet
  */
 function getSheetData() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAMES.RANK_MONITOR);
+  const sheet = SpreadsheetApp.getActiveSheet();
   return sheet.getDataRange().getValues();
 }
 
 /**
- * Gets the Analysis sheet
+ * Gets the active sheet
  */
 function getRankMonitorSheet() {
-  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAMES.RANK_MONITOR);
+  return SpreadsheetApp.getActiveSheet();
 }
 
 /**
@@ -380,10 +753,10 @@ function logSubmitRequest(primeUrl, requestData) {
     ];
 
     sheet.appendRow(rowData);
-    console.log(`📤 San Antonio Desktop submit request logged for: ${primeUrl}`);
+    console.log(`📤 Active Tab submit request logged for: ${primeUrl}`);
 
   } catch (error) {
-    console.error('Failed to log San Antonio Desktop submit request:', error);
+    console.error('Failed to log Active Tab submit request:', error);
   }
 }
 
@@ -402,16 +775,16 @@ function logResultsDump(primeUrl, rawResponse) {
     ];
 
     sheet.appendRow(rowData);
-    console.log(`📥 San Antonio Desktop results dump logged for: ${primeUrl}`);
+    console.log(`📥 Active Tab results dump logged for: ${primeUrl}`);
 
   } catch (error) {
-    console.error('Failed to log San Antonio Desktop results dump:', error);
+    console.error('Failed to log Active Tab results dump:', error);
   }
 }
 
 /**
  * Converts Google Sheets data to preflight structure
- * (Adapted from buildPreflight.js for San Antonio Desktop)
+ * Updated for new column structure: Office, State, Targets, Service, Lat, Long, Prime_URL, Population, Income
  */
 function buildPreflightFromSheet(sheetData) {
   const output = {};
@@ -422,13 +795,14 @@ function buildPreflightFromSheet(sheetData) {
 
     // Extract data from columns
     const office = row[BASE_COLUMNS.OFFICE]?.toString().trim();
+    const state = row[BASE_COLUMNS.STATE]?.toString().trim();
     const target = row[BASE_COLUMNS.TARGETS]?.toString().trim();
     const service = row[BASE_COLUMNS.SERVICE]?.toString().trim();
     const lat = parseFloat(row[BASE_COLUMNS.LAT]);
     const long = parseFloat(row[BASE_COLUMNS.LONG]);
     const primeUrl = row[BASE_COLUMNS.PRIME_URL]?.toString().trim();
-
-    // Skip incomplete rows (but allow empty primeUrl - we'll generate it)
+    
+    // Skip incomplete rows (require office, target, service, and coordinates)
     if (!office || !target || !service || isNaN(lat) || isNaN(long)) {
       continue;
     }
@@ -436,11 +810,8 @@ function buildPreflightFromSheet(sheetData) {
     // Create geo coordinate string
     const geo_coordinate = `${lat},${long}`;
 
-    // Generate intended URL (adjust domain for San Antonio if different)
-    const intended_url = `https://${office.toLowerCase()}.aaacwildliferemoval.com/service-area/${target.toLowerCase().replace(/\s+/g, '-')}/`;
-    
-    // Use provided primeUrl or generate one if empty
-    const finalPrimeUrl = primeUrl || intended_url;
+    // Use provided prime URL or generate one
+    const intended_url = primeUrl || `https://${office.toLowerCase()}.aaacwildliferemoval.com/service-area/${target.toLowerCase().replace(/\s+/g, '-')}/`;
 
     // Initialize office group if not exists
     if (!output[office]) {
@@ -452,7 +823,6 @@ function buildPreflightFromSheet(sheetData) {
       location: target,
       service: service,
       intended_url: intended_url,
-      prime_url: finalPrimeUrl, // Store the specific URL to track
       geo_coordinate: geo_coordinate,
       keywords: [service],
       rowIndex: i // Store row index for writing task IDs back
@@ -474,7 +844,7 @@ function submitJobsToDataForSEO(preflightData) {
     results[office] = [];
 
     for (const item of items) {
-      const { geo_coordinate, keywords, rowIndex, location, service, prime_url } = item;
+      const { geo_coordinate, keywords, rowIndex, location, service, intended_url } = item;
 
       for (const keyword of keywords) {
         try {
@@ -488,7 +858,7 @@ function submitJobsToDataForSEO(preflightData) {
           }];
 
           // Log request to submit_requests tab
-          logSubmitRequest(prime_url, postData[0]);
+          logSubmitRequest(intended_url, postData[0]);
 
           // Make API call
           const response = UrlFetchApp.fetch(`${config.baseUrl}/task_post`, {
@@ -504,7 +874,7 @@ function submitJobsToDataForSEO(preflightData) {
           const taskId = responseData.tasks[0].id;
 
           // Log successful response to audit
-          console.log(`✅ San Antonio Desktop job submitted successfully for ${prime_url}: ${taskId}`);
+          console.log(`✅ Analysis job submitted successfully for ${intended_url}: ${taskId}`);
 
           results[office].push({
             ...item,
@@ -514,10 +884,10 @@ function submitJobsToDataForSEO(preflightData) {
           });
 
         } catch (error) {
-          console.error(`Error submitting San Antonio Desktop job for keyword "${keyword}":`, error);
+          console.error(`Error submitting Active Tab job for keyword "${keyword}":`, error);
 
           // Log error to audit
-          console.error(`❌ Failed to submit San Antonio Desktop job for ${prime_url}: ${error.message}`);
+          console.error(`❌ Failed to submit Analysis job for ${intended_url}: ${error.message}`);
 
           results[office].push({
             ...item,
@@ -541,7 +911,7 @@ function writeTaskIdsToSheet(taskResults) {
   const sheet = getRankMonitorSheet();
   const columns = findNextEmptyColumns();
 
-  // Add headers for this check
+  // Add headers for this check (always overwrite J and K)
   const headerRow = 1;
   const timestamp = new Date().toLocaleDateString();
 
@@ -586,7 +956,7 @@ function fetchResultsFromDataForSEO(taskIds) {
   for (const task of taskIds) {
     try {
       // Log request to audit
-      console.log(`📥 Fetching San Antonio Desktop results for ${task.prime_url}: ${task.taskId}`);
+      console.log(`📥 Fetching Analysis results for ${task.intended_url}: ${task.taskId}`);
 
       // Fetch results for this task
       const response = UrlFetchApp.fetch(
@@ -606,8 +976,8 @@ function fetchResultsFromDataForSEO(taskIds) {
       console.log(`📈 Results Length: ${taskResult.result ? taskResult.result.length : 'null'}`);
 
       if (taskResult.result && taskResult.result.length > 0) {
-        // Extract ranking data for the specific prime_url
-        const rankings = extractRankingData(taskResult.result, task.prime_url);
+        // Extract ranking data for any aaacwildliferemoval.com domain
+        const rankings = extractRankingData(taskResult.result, task.intended_url);
 
         // Get raw SERP results (all organic items)
         const rawSerpItems = taskResult.result[0]?.items || [];
@@ -617,9 +987,9 @@ function fetchResultsFromDataForSEO(taskIds) {
 
         // Log successful response to audit
         // Log raw DataForSEO response to results_dump tab
-        logResultsDump(task.prime_url, taskResult);
+        logResultsDump(task.intended_url, taskResult);
 
-        console.log(`✅ San Antonio Desktop results fetched for ${task.prime_url}: Found ${rawSerpItems.length} items, Prime URL rank: ${rankings.length > 0 ? rankings[0].rank : 'Not found'}`);
+        console.log(`✅ Analysis results fetched for ${task.intended_url}: Found ${rawSerpItems.length} items, Domain rank: ${rankings.length > 0 ? rankings[0].rank : 'Not found'}`);
 
         results.push({
           ...task,
@@ -628,7 +998,7 @@ function fetchResultsFromDataForSEO(taskIds) {
         });
       } else {
         // Log no results to audit
-        console.log(`⚠️ No San Antonio Desktop results found for ${task.prime_url}: ${task.taskId}`);
+        console.log(`⚠️ No Analysis results found for ${task.intended_url}: ${task.taskId}`);
 
         results.push({
           ...task,
@@ -638,10 +1008,10 @@ function fetchResultsFromDataForSEO(taskIds) {
       }
 
     } catch (error) {
-      console.error(`Error fetching San Antonio Desktop results for task ${task.taskId}:`, error);
+      console.error(`Error fetching Active Tab results for task ${task.taskId}:`, error);
 
       // Log error to audit
-      console.error(`❌ Failed to fetch San Antonio Desktop results for ${task.prime_url}: ${error.message}`);
+      console.error(`❌ Failed to fetch Analysis results for ${task.intended_url}: ${error.message}`);
 
       results.push({
         ...task,
@@ -658,14 +1028,14 @@ function fetchResultsFromDataForSEO(taskIds) {
 /**
  * Extracts ranking data from SERP results, looking for any aaacwildliferemoval.com domain
  * @param {Array} serpResults - Raw SERP results from DataForSEO
- * @param {string} primeUrl - The specific URL context (used for logging)
+ * @param {string} intendedUrl - The intended URL context (used for logging)
  * @returns {Array} Array of ranking objects with rank and URL (for any aaacwildliferemoval.com domain)
  */
-function extractRankingData(serpResults, primeUrl) {
+function extractRankingData(serpResults, intendedUrl) {
   const rankings = [];
   const targetDomain = 'aaacwildliferemoval.com';
 
-  console.log(`🔍 Searching for ${targetDomain} in SERP results for ${primeUrl}`);
+  console.log(`🔍 Searching for ${targetDomain} in SERP results for ${intendedUrl}`);
   console.log(`📊 SERP results structure:`, JSON.stringify(serpResults, null, 2));
 
   for (const result of serpResults) {
@@ -695,7 +1065,7 @@ function extractRankingData(serpResults, primeUrl) {
 }
 
 /**
- * Writes results back to the San Antonio Desktop sheet
+ * Writes results back to the Active Tab sheet
  */
 function writeResultsToSheet(results) {
   const sheet = getRankMonitorSheet();
@@ -740,13 +1110,13 @@ function checkJobStatus() {
   const taskIds = getStoredTaskIds();
 
   if (taskIds.length === 0) {
-    SpreadsheetApp.getUi().alert('No Jobs Found', 'No active San Antonio Desktop jobs to check.', SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert('No Jobs Found', 'No active Active Tab jobs to check.', SpreadsheetApp.getUi().ButtonSet.OK);
     return;
   }
 
   SpreadsheetApp.getUi().alert(
     'Job Status',
-    `Found ${taskIds.length} active San Antonio Desktop jobs.\\n\\nIf you submitted jobs 2-5 minutes ago, they should be ready.\\n\\nClick "Get Results" to fetch them.`,
+    `Found ${taskIds.length} active Active Tab jobs.\\n\\nIf you submitted jobs 2-5 minutes ago, they should be ready.\\n\\nClick "Get Results" to fetch them.`,
     SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
@@ -761,12 +1131,12 @@ function viewSubmitRequests() {
 
     SpreadsheetApp.getUi().alert(
       '📤 Submit Requests Log',
-      `San Antonio Desktop submit requests log opened! This sheet shows all requests sent to DataForSEO.\\n\\nColumns:\\n- Prime URL: The specific URL being tracked\\n- Request Data: The complete request payload`,
+      `Analysis submit requests log opened! This sheet shows all requests sent to DataForSEO.\\n\\nColumns:\\n- Prime URL: The specific URL being tracked\\n- Request Data: The complete request payload`,
       SpreadsheetApp.getUi().ButtonSet.OK
     );
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error', `Failed to open San Antonio Desktop submit requests: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to open Analysis submit requests: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
@@ -780,22 +1150,22 @@ function viewResultsDump() {
 
     SpreadsheetApp.getUi().alert(
       '📥 Results Dump',
-      `San Antonio Desktop results dump opened! This sheet shows all raw responses from DataForSEO.\\n\\nColumns:\\n- Prime URL: The specific URL being tracked\\n- Raw DataForSEO Response: Complete response including all SERP data`,
+      `Analysis results dump opened! This sheet shows all raw responses from DataForSEO.\\n\\nColumns:\\n- Prime URL: The specific URL being tracked\\n- Raw DataForSEO Response: Complete response including all SERP data`,
       SpreadsheetApp.getUi().ButtonSet.OK
     );
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error', `Failed to open San Antonio Desktop results dump: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to open Analysis results dump: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
 /**
- * Clears task data from San Antonio Desktop sheet and temporary storage
+ * Clears task data from active sheet and temporary storage
  */
 function clearTaskData() {
   const response = SpreadsheetApp.getUi().alert(
     'Clear Task Data',
-    'This will clear all ranking data from the San Antonio Desktop sheet and stored task IDs. Continue?',
+    'This will clear all ranking data from the active sheet and stored task IDs. Continue?',
     SpreadsheetApp.getUi().ButtonSet.YES_NO
   );
 
@@ -804,17 +1174,24 @@ function clearTaskData() {
   const sheet = getRankMonitorSheet();
   const lastRow = sheet.getLastRow();
 
-  // Clear all ranking data columns (starting from column I)
-  const startCol = BASE_COLUMNS.PRIME_URL + 1; // +1 for 1-based indexing
-  const numCols = sheet.getLastColumn() - BASE_COLUMNS.PRIME_URL;
-  if (numCols > 0) {
-    sheet.getRange(1, startCol, lastRow, numCols).clearContent(); // Clear headers too
+  // Clear only ranking data columns J and K
+  const rankCol = BASE_COLUMNS.FIRST_DATA_COL + 1; // Column J (1-based)
+  const urlCol = BASE_COLUMNS.FIRST_DATA_COL + 2;  // Column K (1-based)
+  
+  // Clear headers
+  sheet.getRange(1, rankCol).clearContent();
+  sheet.getRange(1, urlCol).clearContent();
+  
+  // Clear data rows
+  if (lastRow > 1) {
+    sheet.getRange(2, rankCol, lastRow - 1, 1).clearContent(); // Clear rank column
+    sheet.getRange(2, urlCol, lastRow - 1, 1).clearContent();  // Clear URL column
   }
 
   // Clear stored task IDs
   clearStoredTaskIds();
 
-  SpreadsheetApp.getUi().alert('✅ Cleared', 'San Antonio Desktop task data and stored task IDs have been cleared.', SpreadsheetApp.getUi().ButtonSet.OK);
+  SpreadsheetApp.getUi().alert('✅ Cleared', 'Analysis task data and stored task IDs have been cleared.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /**
@@ -830,7 +1207,7 @@ function testDataForSEOConnection() {
     });
 
     if (response.getResponseCode() === 200) {
-      SpreadsheetApp.getUi().alert('✅ Connection Successful', 'DataForSEO API connection is working for San Antonio Desktop!', SpreadsheetApp.getUi().ButtonSet.OK);
+      SpreadsheetApp.getUi().alert('✅ Connection Successful', 'DataForSEO API connection is working for Active Tab!', SpreadsheetApp.getUi().ButtonSet.OK);
     } else {
       SpreadsheetApp.getUi().alert('❌ Connection Failed', `API returned status: ${response.getResponseCode()}`, SpreadsheetApp.getUi().ButtonSet.OK);
     }
@@ -859,7 +1236,7 @@ function storeTaskIds(taskResults) {
           keyword: item.service,
           office: office,
           target: item.location,
-          prime_url: item.prime_url,
+          intended_url: item.intended_url,
           rankColumn: item.rankColumn,
           urlColumn: item.urlColumn
         });
@@ -867,12 +1244,12 @@ function storeTaskIds(taskResults) {
     }
   }
 
-  // Store in Script Properties with timestamp (use unique key for San Antonio Desktop)
+  // Store in Script Properties with timestamp (use unique key for Active Tab)
   const timestamp = new Date().getTime();
   PropertiesService.getScriptProperties().setProperty('sanAntonioDesktopTaskIds', JSON.stringify(taskData));
   PropertiesService.getScriptProperties().setProperty('sanAntonioDesktopTaskIds_timestamp', timestamp.toString());
 
-  console.log(`Stored ${taskData.length} San Antonio Desktop task IDs temporarily`);
+  console.log(`Stored ${taskData.length} Active Tab task IDs temporarily`);
 }
 
 /**
@@ -884,7 +1261,7 @@ function getStoredTaskIds() {
     const timestamp = PropertiesService.getScriptProperties().getProperty('sanAntonioDesktopTaskIds_timestamp');
 
     if (!taskData) {
-      console.log('No stored San Antonio Desktop task IDs found');
+      console.log('No stored Active Tab task IDs found');
       return [];
     }
 
@@ -894,17 +1271,17 @@ function getStoredTaskIds() {
     const maxAge = 30 * 60 * 1000; // 30 minutes
 
     if (currentTime - storedTime > maxAge) {
-      console.log('Stored San Antonio Desktop task IDs are too old, clearing them');
+      console.log('Stored Active Tab task IDs are too old, clearing them');
       clearStoredTaskIds();
       return [];
     }
 
     const parsed = JSON.parse(taskData);
-    console.log(`Retrieved ${parsed.length} stored San Antonio Desktop task IDs`);
+    console.log(`Retrieved ${parsed.length} stored Active Tab task IDs`);
     return parsed;
 
   } catch (error) {
-    console.error('Error retrieving stored San Antonio Desktop task IDs:', error);
+    console.error('Error retrieving stored Active Tab task IDs:', error);
     return [];
   }
 }
@@ -915,7 +1292,7 @@ function getStoredTaskIds() {
 function clearStoredTaskIds() {
   PropertiesService.getScriptProperties().deleteProperty('sanAntonioDesktopTaskIds');
   PropertiesService.getScriptProperties().deleteProperty('sanAntonioDesktopTaskIds_timestamp');
-  console.log('Cleared stored San Antonio Desktop task IDs');
+  console.log('Cleared stored Active Tab task IDs');
 }
 
 // =============================================================================
@@ -931,8 +1308,8 @@ function setupDailyAutomation() {
 
     // Show information about automation
     const setupResponse = ui.alert(
-      '🤖 Setup San Antonio Desktop Daily Automation',
-      'This will create a daily trigger to automatically check San Antonio Desktop rankings.\\n\\nAfter clicking OK, you will be shown instructions to set up the time trigger manually in the Apps Script interface.',
+      '🤖 Setup Active Tab Daily Automation',
+      'This will create a daily trigger to automatically check Active Tab rankings.\\n\\nAfter clicking OK, you will be shown instructions to set up the time trigger manually in the Apps Script interface.',
       ui.ButtonSet.OK_CANCEL
     );
 
@@ -947,7 +1324,7 @@ function setupDailyAutomation() {
     if (dailyTrigger) {
       ui.alert(
         '⚠️ Automation Already Active',
-        'San Antonio Desktop daily automation is already set up!\\n\\nIf you want to change the time, first click "Disable Automation", then set it up again.',
+        'Active Tab daily automation is already set up!\\n\\nIf you want to change the time, first click "Disable Automation", then set it up again.',
         ui.ButtonSet.OK
       );
       return;
@@ -956,7 +1333,7 @@ function setupDailyAutomation() {
     // Show setup instructions
     ui.alert(
       '📋 Setup Instructions',
-      'To complete the San Antonio Desktop setup:\\n\\n1. Go to Apps Script (script.google.com)\\n2. Open your project\\n3. Click "Triggers" (clock icon on left)\\n4. Click "+ Add Trigger"\\n5. Choose:\\n   - Function: dailyRankingCheck\\n   - Event source: Time-driven\\n   - Type: Day timer\\n   - Time: Pick your preferred time\\n6. Click "Save"\\n\\nRecommended time: 9:00 AM (after business hours start)',
+      'To complete the Active Tab setup:\\n\\n1. Go to Apps Script (script.google.com)\\n2. Open your project\\n3. Click "Triggers" (clock icon on left)\\n4. Click "+ Add Trigger"\\n5. Choose:\\n   - Function: dailyRankingCheck\\n   - Event source: Time-driven\\n   - Type: Day timer\\n   - Time: Pick your preferred time\\n6. Click "Save"\\n\\nRecommended time: 9:00 AM (after business hours start)',
       ui.ButtonSet.OK
     );
 
@@ -964,8 +1341,8 @@ function setupDailyAutomation() {
     PropertiesService.getScriptProperties().setProperty('sanAntonioDesktopAutomation_enabled', 'true');
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error', `Failed to setup San Antonio Desktop automation: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
-    console.error('Setup San Antonio Desktop automation error:', error);
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to setup Active Tab automation: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    console.error('Setup Active Tab automation error:', error);
   }
 }
 
@@ -977,8 +1354,8 @@ function disableAutomation() {
     const ui = SpreadsheetApp.getUi();
 
     const response = ui.alert(
-      '🔕 Disable San Antonio Desktop Automation',
-      'This will remove the San Antonio Desktop daily automation trigger. You can still run rankings manually.\\n\\nContinue?',
+      '🔕 Disable Active Tab Automation',
+      'This will remove the Active Tab daily automation trigger. You can still run rankings manually.\\n\\nContinue?',
       ui.ButtonSet.YES_NO
     );
 
@@ -1001,20 +1378,20 @@ function disableAutomation() {
     if (removedCount > 0) {
       ui.alert(
         '✅ Automation Disabled',
-        `Removed ${removedCount} San Antonio Desktop automation trigger(s).\\n\\nDaily automation is now disabled. You can still run rankings manually using the menu.`,
+        `Removed ${removedCount} Active Tab automation trigger(s).\\n\\nDaily automation is now disabled. You can still run rankings manually using the menu.`,
         ui.ButtonSet.OK
       );
     } else {
       ui.alert(
         'ℹ️ No Automation Found',
-        'No active San Antonio Desktop automation triggers were found to remove.',
+        'No active Active Tab automation triggers were found to remove.',
         ui.ButtonSet.OK
       );
     }
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Error', `Failed to disable San Antonio Desktop automation: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
-    console.error('Disable San Antonio Desktop automation error:', error);
+    SpreadsheetApp.getUi().alert('❌ Error', `Failed to disable Active Tab automation: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    console.error('Disable Active Tab automation error:', error);
   }
 }
 
@@ -1026,26 +1403,26 @@ function testDailyRankingCheck() {
     const ui = SpreadsheetApp.getUi();
 
     const response = ui.alert(
-      '🧪 Test San Antonio Desktop Daily Check',
-      'This will run the complete automated San Antonio Desktop daily ranking check process.\\n\\nThis includes:\\n- Submit jobs\\n- Wait 5 minutes\\n- Get results\\n\\nThis may take 6-7 minutes total. Continue?',
+      '🧪 Test Active Tab Daily Check',
+      'This will run the complete automated Active Tab daily ranking check process.\\n\\nThis includes:\\n- Submit jobs\\n- Wait 5 minutes\\n- Get results\\n\\nThis may take 6-7 minutes total. Continue?',
       ui.ButtonSet.YES_NO
     );
 
     if (response !== ui.Button.YES) return;
 
-    ui.alert('⏳ Starting Test...', 'Running automated San Antonio Desktop daily check. This will take about 6-7 minutes.\\n\\nYou can monitor progress in the Apps Script logs.', ui.ButtonSet.OK);
+    ui.alert('⏳ Starting Test...', 'Running automated Active Tab daily check. This will take about 6-7 minutes.\\n\\nYou can monitor progress in the Apps Script logs.', ui.ButtonSet.OK);
 
     // Run the daily check
     dailyRankingCheck();
 
     ui.alert(
       '✅ Test Completed!',
-      'San Antonio Desktop daily ranking check test completed successfully!\\n\\nCheck your sheet for updated rankings.',
+      'Active Tab daily ranking check test completed successfully!\\n\\nCheck your sheet for updated rankings.',
       ui.ButtonSet.OK
     );
 
   } catch (error) {
-    SpreadsheetApp.getUi().alert('❌ Test Failed', `San Antonio Desktop daily check test failed: ${error.message}\\n\\nCheck the Apps Script logs for more details.`, SpreadsheetApp.getUi().ButtonSet.OK);
-    console.error('Test San Antonio Desktop daily check error:', error);
+    SpreadsheetApp.getUi().alert('❌ Test Failed', `Active Tab daily check test failed: ${error.message}\\n\\nCheck the Apps Script logs for more details.`, SpreadsheetApp.getUi().ButtonSet.OK);
+    console.error('Test Active Tab daily check error:', error);
   }
 }
